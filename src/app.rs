@@ -544,22 +544,19 @@ pub fn run() -> Result<()> {
         window.on_set_term_bg_color_hex(move |hex: SharedString| {
             let hex_str = hex.to_string();
             let color_opt = parse_hex_color(&hex_str);
-            let brush = match color_opt {
-                Some(c) => c.into(),
-                None => slint::Brush::default(),
-            };
-            {
-                let mut s = store.borrow_mut();
-                if color_opt.is_some() {
+            // 只在颜色有效时更新预览和配置
+            if let Some(c) = color_opt {
+                let brush: slint::Brush = c.into();
+                {
+                    let mut s = store.borrow_mut();
                     s.set_term_bg_color(hex_str);
-                } else {
-                    s.set_term_bg_color(String::new());
+                    let _ = s.save();
                 }
-                let _ = s.save();
+                if let Some(w) = weak.upgrade() {
+                    w.set_term_bg_override(brush);
+                }
             }
-            if let Some(w) = weak.upgrade() {
-                w.set_term_bg_override(brush);
-            }
+            // 无效输入时不操作，保持上次有效颜色
         });
     }
     // 自定义字体颜色（hex 字符串输入）
@@ -569,26 +566,23 @@ pub fn run() -> Result<()> {
         window.on_set_term_fg_color_hex(move |hex: SharedString| {
             let hex_str = hex.to_string();
             let color_opt = parse_hex_color(&hex_str);
-            let brush = match color_opt {
-                Some(c) => c.into(),
-                None => slint::Brush::default(),
-            };
-            {
-                let mut s = store.borrow_mut();
-                if color_opt.is_some() {
+            // 只在颜色有效时更新预览和配置
+            if let Some(c) = color_opt {
+                let brush: slint::Brush = c.into();
+                {
+                    let mut s = store.borrow_mut();
                     s.set_term_fg_color(hex_str);
-                } else {
-                    s.set_term_fg_color(String::new());
+                    let _ = s.save();
                 }
-                let _ = s.save();
+                // 同步到全局 THEME_OVERRIDE
+                if let Ok(mut theme) = THEME_OVERRIDE.lock() {
+                    theme.fg_override = Some(c);
+                }
+                if let Some(w) = weak.upgrade() {
+                    w.set_term_fg_override(brush);
+                }
             }
-            // 同步到全局 THEME_OVERRIDE
-            if let Ok(mut theme) = THEME_OVERRIDE.lock() {
-                theme.fg_override = color_opt;
-            }
-            if let Some(w) = weak.upgrade() {
-                w.set_term_fg_override(brush);
-            }
+            // 无效输入时不操作，保持上次有效颜色
         });
     }
 

@@ -133,6 +133,7 @@ export component AppWindow inherits Window {
     in-out property <length> term-font-size <=> Theme.term-font-size;
     in-out property <string> ui-font-family <=> Theme.ui-font-family;
     in property <[string]> term-fonts;             // installed monospace families
+    property <string> term-sub-tab: "bg";  // 终端设置子标签: "bg" | "font"
 
     // 终端背景自定义
     in-out property <brush> term-bg-override <=> Theme.term-bg-override;  // 自定义背景色
@@ -2117,362 +2118,382 @@ export component AppWindow inherits Window {
                             }
                         }
 
-                        // 终端背景设置页
+                        // 终端设置页（子标签：背景 / 字体）
                         if root.ifd-page == "terminal" : VerticalLayout {
                             padding: 18px;
                             spacing: 16px;
                             alignment: start;
 
-                            // 预设背景色 + hex 输入
-                            VerticalLayout {
+                            // 子标签栏
+                            HorizontalLayout {
                                 spacing: 4px;
-                                Text {
-                                    text: root.lang-en ? "Background Color" : "背景颜色";
-                                    color: Theme.text-secondary;
-                                    font-size: Theme.fs-sm;
+                                Rectangle {
+                                    width: 60px; height: 24px;
+                                    border-radius: Theme.radius-sm;
+                                    background: root.term-sub-tab == "bg" ? Theme.accent : (bg-tab-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated);
+                                    bg-tab-ta := TouchArea { mouse-cursor: pointer; clicked => { root.term-sub-tab = "bg"; } }
+                                    Text { text: root.lang-en ? "Background" : "背景"; color: root.term-sub-tab == "bg" ? #ffffff : Theme.text-primary; font-size: Theme.fs-sm; horizontal-alignment: center; vertical-alignment: center; }
                                 }
-                                // 预设色块行
-                                HorizontalLayout {
-                                    spacing: 4px;
-                                    // 默认色按钮
-                                    Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: 4px;
-                                        border-width: 2px;
-                                        border-color: root.term-bg-override == transparent ? Theme.accent : Theme.border-subtle;
-                                        background: Theme.term-bg;
-                                        TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-bg-color(-1); }
-                                        }
-                                    }
-                                    // 预设色按钮
-                                    for color[i] in root.bg-color-presets : Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: 4px;
-                                        border-width: 2px;
-                                        border-color: root.term-bg-override == color ? Theme.accent : Theme.border-subtle;
-                                        background: color;
-                                        TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-bg-color(i); }
-                                        }
-                                    }
-                                    Rectangle { horizontal-stretch: 1; }
+                                Rectangle {
+                                    width: 60px; height: 24px;
+                                    border-radius: Theme.radius-sm;
+                                    background: root.term-sub-tab == "font" ? Theme.accent : (font-tab-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated);
+                                    font-tab-ta := TouchArea { mouse-cursor: pointer; clicked => { root.term-sub-tab = "font"; } }
+                                    Text { text: root.lang-en ? "Font" : "字体"; color: root.term-sub-tab == "font" ? #ffffff : Theme.text-primary; font-size: Theme.fs-sm; horizontal-alignment: center; vertical-alignment: center; }
                                 }
-                                // hex 输入行：输入框 + 预览 + 应用按钮
-                                HorizontalLayout {
-                                    spacing: 4px;
-                                    // hex 输入框
-                                    Rectangle {
-                                        width: 120px; height: 26px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: Theme.bg-elevated;
-                                        TextInput {
-                                            x: 6px; y: 0;
-                                            width: parent.width - 12px;
-                                            height: parent.height;
-                                            vertical-alignment: center;
-                                            color: Theme.text-primary;
-                                            font-size: Theme.fs-sm;
-                                            font-family: "monospace";
-                                            text <=> root.term-bg-hex-input;
-                                            // 实时预览：每输入一个字符都更新预览色
-                                            edited => { root.set-term-bg-color-hex(root.term-bg-hex-input); }
-                                            // 按回车正式应用
-                                            accepted => { root.set-term-bg-color-hex(root.term-bg-hex-input); }
-                                        }
-                                    }
-                                    // 预览色块
-                                    Rectangle {
-                                        width: 26px; height: 26px;
-                                        border-radius: 4px;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: root.term-bg-override;
-                                    }
-                                    Rectangle { horizontal-stretch: 1; }
-                                }
+                                Rectangle { horizontal-stretch: 1; }
                             }
 
-                            // 背景图片
-                            VerticalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: root.lang-en ? "Background Image" : "背景图片";
-                                    color: Theme.text-secondary;
-                                    font-size: Theme.fs-sm;
-                                }
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    // 选择图片按钮
-                                    Rectangle {
-                                        width: 100px; height: 28px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: bg-pick-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
-                                        bg-pick-ta := TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.pick-bg-image(); }
-                                        }
-                                        HorizontalLayout {
-                                            spacing: 4px;
-                                            alignment: center;
-                                            Text {
-                                                text: "\u{E2C6}"; // add_photo_alternate
-                                                font-family: "Material Icons";
-                                                color: Theme.text-secondary;
-                                                font-size: 14px;
-                                                vertical-alignment: center;
+                            // ===== 背景标签页 =====
+                            if root.term-sub-tab == "bg" : VerticalLayout {
+                                spacing: 16px;
+                                alignment: start;
+
+                                // 预设背景色 + hex 输入
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    Text {
+                                        text: root.lang-en ? "Background Color" : "背景颜色";
+                                        color: Theme.text-secondary;
+                                        font-size: Theme.fs-sm;
+                                    }
+                                    // 预设色块行
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        // 默认色按钮
+                                        Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: 4px;
+                                            border-width: 2px;
+                                            border-color: root.term-bg-override == transparent ? Theme.accent : Theme.border-subtle;
+                                            background: Theme.term-bg;
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-bg-color(-1); }
                                             }
-                                            Text {
-                                                text: root.lang-en ? "Choose" : "选择图片";
+                                        }
+                                        // 预设色按钮
+                                        for color[i] in root.bg-color-presets : Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: 4px;
+                                            border-width: 2px;
+                                            border-color: root.term-bg-override == color ? Theme.accent : Theme.border-subtle;
+                                            background: color;
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-bg-color(i); }
+                                            }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
+                                    }
+                                    // hex 输入行：输入框 + 预览
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Rectangle {
+                                            width: 120px; height: 26px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: Theme.bg-elevated;
+                                            TextInput {
+                                                x: 6px; y: 0;
+                                                width: parent.width - 12px;
+                                                height: parent.height;
+                                                vertical-alignment: center;
                                                 color: Theme.text-primary;
                                                 font-size: Theme.fs-sm;
-                                                vertical-alignment: center;
+                                                font-family: "monospace";
+                                                text <=> root.term-bg-hex-input;
+                                                // 实时预览
+                                                edited => { root.set-term-bg-color-hex(root.term-bg-hex-input); }
+                                                accepted => { root.set-term-bg-color-hex(root.term-bg-hex-input); }
                                             }
                                         }
-                                    }
-                                    // 清除图片按钮
-                                    Rectangle {
-                                        width: 80px; height: 28px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: bg-clear-ta.has-hover ? Theme.danger.with-alpha(0.15) : Theme.bg-elevated;
-                                        bg-clear-ta := TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.clear-bg-image(); }
+                                        // 预览色块
+                                        Rectangle {
+                                            width: 26px; height: 26px;
+                                            border-radius: 4px;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: root.term-bg-override;
                                         }
-                                        HorizontalLayout {
-                                            spacing: 4px;
-                                            alignment: center;
-                                            Text {
-                                                text: "\u{E15C}"; // delete
-                                                font-family: "Material Icons";
-                                                color: bg-clear-ta.has-hover ? Theme.danger : Theme.text-secondary;
-                                                font-size: 14px;
-                                                vertical-alignment: center;
-                                            }
-                                            Text {
-                                                text: root.lang-en ? "Clear" : "清除";
-                                                color: bg-clear-ta.has-hover ? Theme.danger : Theme.text-primary;
-                                                font-size: Theme.fs-sm;
-                                                vertical-alignment: center;
-                                            }
-                                        }
+                                        Rectangle { horizontal-stretch: 1; }
                                     }
-                                    Rectangle { horizontal-stretch: 1; }
                                 }
-                            }
 
-                            // 透明度控制（用 +/- 按钮代替 Slider）
-                            VerticalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: root.lang-en ? "Image Opacity" : "图片透明度";
-                                    color: Theme.text-secondary;
-                                    font-size: Theme.fs-sm;
-                                }
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    // 减少按钮
-                                    Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: op-minus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
-                                        op-minus-ta := TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-bg-opacity(Math.max(0.0, root.term-bg-opacity - 0.1)); }
-                                        }
-                                        Text {
-                                            text: "−";
-                                            color: Theme.text-primary;
-                                            font-size: Theme.fs-md;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                    // 当前值
-                                    Text {
-                                        text: Math.round(root.term-bg-opacity * 100) + "%";
-                                        color: Theme.text-muted;
-                                        font-size: Theme.fs-sm;
-                                        vertical-alignment: center;
-                                        width: 40px;
-                                        horizontal-alignment: center;
-                                    }
-                                    // 增加按钮
-                                    Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: op-plus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
-                                        op-plus-ta := TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-bg-opacity(Math.min(1.0, root.term-bg-opacity + 0.1)); }
-                                        }
-                                        Text {
-                                            text: "+";
-                                            color: Theme.text-primary;
-                                            font-size: Theme.fs-md;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                    Rectangle { horizontal-stretch: 1; }
-                                }
-                            }
-
-                            // 字体大小控制（+/- 按钮，与透明度相同模式）
-                            VerticalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: root.lang-en ? "Font Size" : "字体大小";
-                                    color: Theme.text-secondary;
-                                    font-size: Theme.fs-sm;
-                                }
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    // 减小字号
-                                    Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: fs-minus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
-                                        fs-minus-ta := TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-font-size(Math.max(8, Math.round(root.term-font-size / 1px) - 1)); }
-                                        }
-                                        Text {
-                                            text: "−";
-                                            color: Theme.text-primary;
-                                            font-size: Theme.fs-md;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                    // 当前字号
-                                    Text {
-                                        text: Math.round(root.term-font-size / 1px) + " px";
-                                        color: Theme.text-muted;
-                                        font-size: Theme.fs-sm;
-                                        vertical-alignment: center;
-                                        width: 50px;
-                                        horizontal-alignment: center;
-                                    }
-                                    // 增大字号
-                                    Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: fs-plus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
-                                        fs-plus-ta := TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-font-size(Math.min(32, Math.round(root.term-font-size / 1px) + 1)); }
-                                        }
-                                        Text {
-                                            text: "+";
-                                            color: Theme.text-primary;
-                                            font-size: Theme.fs-md;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                    Rectangle { horizontal-stretch: 1; }
-                                }
-                            }
-
-                            // 字体颜色 + hex 输入
-                            VerticalLayout {
-                                spacing: 4px;
-                                Text {
-                                    text: root.lang-en ? "Font Color" : "字体颜色";
-                                    color: Theme.text-secondary;
-                                    font-size: Theme.fs-sm;
-                                }
-                                // 预设色块行
-                                HorizontalLayout {
+                                // 背景图片
+                                VerticalLayout {
                                     spacing: 4px;
-                                    // 默认色按钮
-                                    Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: 4px;
-                                        border-width: 2px;
-                                        border-color: root.term-fg-override == transparent ? Theme.accent : Theme.border-subtle;
-                                        background: Theme.term-fg;
-                                        TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-fg-color(-1); }
-                                        }
+                                    Text {
+                                        text: root.lang-en ? "Background Image" : "背景图片";
+                                        color: Theme.text-secondary;
+                                        font-size: Theme.fs-sm;
                                     }
-                                    // 预设色按钮
-                                    for color[i] in root.fg-color-presets : Rectangle {
-                                        width: 22px; height: 22px;
-                                        border-radius: 4px;
-                                        border-width: 2px;
-                                        border-color: root.term-fg-override == color ? Theme.accent : Theme.border-subtle;
-                                        background: color;
-                                        TouchArea {
-                                            mouse-cursor: pointer;
-                                            clicked => { root.set-term-fg-color(i); }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        // 选择图片按钮
+                                        Rectangle {
+                                            width: 100px; height: 28px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: bg-pick-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                            bg-pick-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.pick-bg-image(); }
+                                            }
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                alignment: center;
+                                                Text {
+                                                    text: "\u{E2C6}";
+                                                    font-family: "Material Icons";
+                                                    color: Theme.text-secondary;
+                                                    font-size: 14px;
+                                                    vertical-alignment: center;
+                                                }
+                                                Text {
+                                                    text: root.lang-en ? "Choose" : "选择图片";
+                                                    color: Theme.text-primary;
+                                                    font-size: Theme.fs-sm;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
                                         }
+                                        // 清除图片按钮
+                                        Rectangle {
+                                            width: 80px; height: 28px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: bg-clear-ta.has-hover ? Theme.danger.with-alpha(0.15) : Theme.bg-elevated;
+                                            bg-clear-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.clear-bg-image(); }
+                                            }
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                alignment: center;
+                                                Text {
+                                                    text: "\u{E15C}";
+                                                    font-family: "Material Icons";
+                                                    color: bg-clear-ta.has-hover ? Theme.danger : Theme.text-secondary;
+                                                    font-size: 14px;
+                                                    vertical-alignment: center;
+                                                }
+                                                Text {
+                                                    text: root.lang-en ? "Clear" : "清除";
+                                                    color: bg-clear-ta.has-hover ? Theme.danger : Theme.text-primary;
+                                                    font-size: Theme.fs-sm;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
                                     }
-                                    Rectangle { horizontal-stretch: 1; }
                                 }
-                                // hex 输入行：输入框 + 预览 + 应用按钮
-                                HorizontalLayout {
+
+                                // 透明度控制（+/- 按钮）
+                                VerticalLayout {
                                     spacing: 4px;
-                                    // hex 输入框
-                                    Rectangle {
-                                        width: 120px; height: 26px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: Theme.bg-elevated;
-                                        TextInput {
-                                            x: 6px; y: 0;
-                                            width: parent.width - 12px;
-                                            height: parent.height;
-                                            vertical-alignment: center;
-                                            color: Theme.text-primary;
+                                    Text {
+                                        text: root.lang-en ? "Image Opacity" : "图片透明度";
+                                        color: Theme.text-secondary;
+                                        font-size: Theme.fs-sm;
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: op-minus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                            op-minus-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-bg-opacity(Math.max(0.0, root.term-bg-opacity - 0.1)); }
+                                            }
+                                            Text {
+                                                text: "−";
+                                                color: Theme.text-primary;
+                                                font-size: Theme.fs-md;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                        Text {
+                                            text: Math.round(root.term-bg-opacity * 100) + "%";
+                                            color: Theme.text-muted;
                                             font-size: Theme.fs-sm;
-                                            font-family: "monospace";
-                                            text <=> root.term-fg-hex-input;
-                                            // 实时预览：每输入一个字符都更新预览色
-                                            edited => { root.set-term-fg-color-hex(root.term-fg-hex-input); }
-                                            // 按回车正式应用
-                                            accepted => { root.set-term-fg-color-hex(root.term-fg-hex-input); }
+                                            vertical-alignment: center;
+                                            width: 40px;
+                                            horizontal-alignment: center;
                                         }
+                                        Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: op-plus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                            op-plus-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-bg-opacity(Math.min(1.0, root.term-bg-opacity + 0.1)); }
+                                            }
+                                            Text {
+                                                text: "+";
+                                                color: Theme.text-primary;
+                                                font-size: Theme.fs-md;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
                                     }
-                                    // 预览色块
-                                    Rectangle {
-                                        width: 26px; height: 26px;
-                                        border-radius: 4px;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: root.term-fg-override;
-                                    }
-                                    Rectangle { horizontal-stretch: 1; }
+                                }
+
+                                // 说明文字
+                                Text {
+                                    text: root.lang-en
+                                        ? "Background image overlays on top of the background color. Adjust opacity to make terminal text readable."
+                                        : "背景图片叠加在背景色之上，调节透明度使终端文字清晰可读。";
+                                    color: Theme.text-muted;
+                                    font-size: Theme.fs-xs;
+                                    wrap: word-wrap;
                                 }
                             }
 
-                            // 说明文字
-                            Text {
-                                text: root.lang-en
-                                    ? "Background image overlays on top of the background color. Adjust opacity to make terminal text readable."
-                                    : "背景图片叠加在背景色之上，调节透明度使终端文字清晰可读。";
-                                color: Theme.text-muted;
-                                font-size: Theme.fs-xs;
-                                wrap: word-wrap;
+                            // ===== 字体标签页 =====
+                            if root.term-sub-tab == "font" : VerticalLayout {
+                                spacing: 16px;
+                                alignment: start;
+
+                                // 字体大小控制（+/- 按钮）
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    Text {
+                                        text: root.lang-en ? "Font Size" : "字体大小";
+                                        color: Theme.text-secondary;
+                                        font-size: Theme.fs-sm;
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: fs-minus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                            fs-minus-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-font-size(Math.max(8, Math.round(root.term-font-size / 1px) - 1)); }
+                                            }
+                                            Text {
+                                                text: "−";
+                                                color: Theme.text-primary;
+                                                font-size: Theme.fs-md;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                        Text {
+                                            text: Math.round(root.term-font-size / 1px) + " px";
+                                            color: Theme.text-muted;
+                                            font-size: Theme.fs-sm;
+                                            vertical-alignment: center;
+                                            width: 50px;
+                                            horizontal-alignment: center;
+                                        }
+                                        Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: fs-plus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                            fs-plus-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-font-size(Math.min(32, Math.round(root.term-font-size / 1px) + 1)); }
+                                            }
+                                            Text {
+                                                text: "+";
+                                                color: Theme.text-primary;
+                                                font-size: Theme.fs-md;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
+                                    }
+                                }
+
+                                // 字体颜色 + hex 输入
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    Text {
+                                        text: root.lang-en ? "Font Color" : "字体颜色";
+                                        color: Theme.text-secondary;
+                                        font-size: Theme.fs-sm;
+                                    }
+                                    // 预设色块行
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: 4px;
+                                            border-width: 2px;
+                                            border-color: root.term-fg-override == transparent ? Theme.accent : Theme.border-subtle;
+                                            background: Theme.term-fg;
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-fg-color(-1); }
+                                            }
+                                        }
+                                        for color[i] in root.fg-color-presets : Rectangle {
+                                            width: 22px; height: 22px;
+                                            border-radius: 4px;
+                                            border-width: 2px;
+                                            border-color: root.term-fg-override == color ? Theme.accent : Theme.border-subtle;
+                                            background: color;
+                                            TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.set-term-fg-color(i); }
+                                            }
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
+                                    }
+                                    // hex 输入行：输入框 + 预览
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Rectangle {
+                                            width: 120px; height: 26px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: Theme.bg-elevated;
+                                            TextInput {
+                                                x: 6px; y: 0;
+                                                width: parent.width - 12px;
+                                                height: parent.height;
+                                                vertical-alignment: center;
+                                                color: Theme.text-primary;
+                                                font-size: Theme.fs-sm;
+                                                font-family: "monospace";
+                                                text <=> root.term-fg-hex-input;
+                                                // 实时预览
+                                                edited => { root.set-term-fg-color-hex(root.term-fg-hex-input); }
+                                                accepted => { root.set-term-fg-color-hex(root.term-fg-hex-input); }
+                                            }
+                                        }
+                                        // 预览色块
+                                        Rectangle {
+                                            width: 26px; height: 26px;
+                                            border-radius: 4px;
+                                            border-width: 1px;
+                                            border-color: Theme.border-subtle;
+                                            background: root.term-fg-override;
+                                        }
+                                        Rectangle { horizontal-stretch: 1; }
+                                    }
+                                }
                             }
                         }
                     }  // content-area VerticalLayout
