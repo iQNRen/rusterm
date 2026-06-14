@@ -24,7 +24,7 @@ the tens-of-MB range of a native binary.
 
 Every `v*` tag triggers a GitHub Actions build that produces native binaries for
 **Windows / Linux / macOS**, published on the
-[Releases](https://github.com/jeff141/rusterm/releases) page.
+[Releases](https://github.com/iqnren/rusterm/releases) page.
 
 ### Windows
 

@@ -1,0 +1,213 @@
+import { Theme } from "theme.slint";
+import { LabeledInput, PrimaryButton, GhostButton } from "widgets.slint";
+
+// WebDAV 同步设置对话框
+// 样式与 SessionDialog 保持一致，支持深色/浅色主题
+export component WebDavDialog inherits Rectangle {
+    // ── 对外属性 ──
+    in-out property <bool> open: false;
+    in-out property <string> url: "";
+    in-out property <string> username: "";
+    in-out property <string> password: "";
+    in-out property <bool> enabled: false;
+    in-out property <bool> auto-sync: false;
+    in-out property <string> status: "";
+    in-out property <bool> busy: false;
+
+    // ── 对外回调 ──
+    callback test-connection();
+    callback upload();
+    callback download();
+    callback save(string, string, string, bool, bool);
+    callback cancel();
+
+    visible: open;
+    width: 100%;
+    height: 100%;
+    background: #00000060;
+
+    // 对话框主体
+    dialog-box := Rectangle {
+        width: 400px;
+        height: root.height.min(480px);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: Theme.radius-lg;
+        background: Theme.bg-panel;
+        border-width: 1px;
+        border-color: Theme.border-subtle;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 16px;
+
+            // ── 标题栏 ──
+            Text {
+                text: "WebDAV 同步";
+                font-size: Theme.fs-xl;
+                color: Theme.text-primary;
+                font-weight: 700;
+            }
+
+            // ── 分割线 ──
+            Rectangle {
+                height: 1px;
+                background: Theme.border-subtle;
+            }
+
+            // ── 表单区域 ──
+            Flickable {
+                vertical-stretch: 1;
+                viewport-height: form-layout.preferred-height;
+
+                form-layout := VerticalLayout {
+                    spacing: 12px;
+
+                    LabeledInput {
+                        label: "服务器地址";
+                        placeholder: "https://dav.jianguoyun.com/dav/your-path/";
+                        value <=> root.url;
+                    }
+
+                    LabeledInput {
+                        label: "用户名";
+                        placeholder: "坚果云邮箱";
+                        value <=> root.username;
+                    }
+
+                    LabeledInput {
+                        label: "应用密码";
+                        placeholder: "第三方应用专用密码（非登录密码）";
+                        value <=> root.password;
+                        password: true;
+                    }
+
+                    // ── 开关选项 ──
+                    HorizontalLayout {
+                        spacing: 16px;
+                        height: 32px;
+
+                        // 启用同步
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            toggle-enabled := Rectangle {
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: root.enabled ? Theme.accent : Theme.border-subtle;
+                                background: root.enabled ? Theme.accent : Theme.bg-root;
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.enabled = !root.enabled; }
+                                }
+                                if root.enabled : Text {
+                                    text: "✓";
+                                    color: white;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            Text {
+                                text: "启用同步";
+                                color: Theme.text-primary;
+                                font-size: Theme.fs-sm;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // 自动同步
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            Rectangle {
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 4px;
+                                border-width: 1px;
+                                border-color: root.auto-sync ? Theme.accent : Theme.border-subtle;
+                                background: root.auto-sync ? Theme.accent : Theme.bg-root;
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.auto-sync = !root.auto-sync; }
+                                }
+                                if root.auto-sync : Text {
+                                    text: "✓";
+                                    color: white;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                            Text {
+                                text: "自动同步";
+                                color: Theme.text-primary;
+                                font-size: Theme.fs-sm;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // ── 状态栏 ──
+                    if root.status != "" : Rectangle {
+                        height: 32px;
+                        border-radius: Theme.radius-sm;
+                        background: Theme.bg-elevated;
+                        Text {
+                            x: 12px;
+                            width: parent.width - 24px;
+                            text: root.status;
+                            color: Theme.text-secondary;
+                            font-size: Theme.fs-sm;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+
+            // ── 分割线 ──
+            Rectangle {
+                height: 1px;
+                background: Theme.border-subtle;
+            }
+
+            // ── 按钮栏 ──
+            HorizontalLayout {
+                spacing: 8px;
+                height: 36px;
+
+                GhostButton {
+                    text: root.busy ? "测试中..." : "测试连接";
+                    clicked => { root.test-connection(); }
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                GhostButton {
+                    text: "上传";
+                    clicked => { root.upload(); }
+                }
+
+                GhostButton {
+                    text: "下载";
+                    clicked => { root.download(); }
+                }
+
+                PrimaryButton {
+                    text: "保存";
+                    clicked => {
+                        root.save(root.url, root.username, root.password, root.enabled, root.auto-sync);
+                    }
+                }
+
+                GhostButton {
+                    text: "取消";
+                    clicked => { root.cancel(); }
+                }
+            }
+        }
+    }
+}

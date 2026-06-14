@@ -14,6 +14,7 @@ import { Sidebar, DiskInfo } from "sidebar.slint";
 import { TabBar, TabInfo } from "tabs.slint";
 import { Welcome, SessionInfo } from "welcome.slint";
 import { SessionDialog, SessionDraft, PortFwd } from "session_dialog.slint";
+import { WebDavDialog } from "webdav_dialog.slint";
 import { ConfirmDialog } from "confirm_dialog.slint";
 import { TerminalView, TermSpan, TermMatch, QuickCmd } from "terminal_view.slint";
 import { SftpEntry, SftpTreeNode } from "sftp_panel.slint";
@@ -376,7 +377,6 @@ export component AppWindow inherits Window {
             app-version: root.app-version;
             select-net-iface(i) => { root.select-net-iface(i); }
             show-processes() => { root.proc-open = true; }
-            open-webdav() => { webdav-open-dialog(); }
         }
 
         // Right side: tabs + content
@@ -2218,66 +2218,21 @@ export component AppWindow inherits Window {
     }
 
     // ── WebDAV sync dialog ──
-    if (show-webdav-dialog) : Rectangle {
-        background: #00000080;
-        Rectangle {
-            width: 380px; height: 380px;
-            border-radius: Theme.radius-md;
-            background: Theme.bg-panel;
-            border-width: 1px; border-color: Theme.border-subtle;
-            VerticalLayout {
-                padding: 20px; spacing: 12px;
-                Text { text: "WebDAV 同步"; font-size: 16px; color: Theme.text-primary; font-weight: 600; }
-                VerticalLayout { spacing: 4px;
-                    Text { text: "服务器地址"; font-size: 11px; color: Theme.text-muted; }
-                    webdav-url-in := TextInput { text: webdav-url; }
-                }
-                VerticalLayout { spacing: 4px;
-                    Text { text: "用户名"; font-size: 11px; color: Theme.text-muted; }
-                    webdav-user-in := TextInput { text: webdav-username; }
-                }
-                VerticalLayout { spacing: 4px;
-                    Text { text: "应用密码"; font-size: 11px; color: Theme.text-muted; }
-                    webdav-pass-in := TextInput { input-type: InputType.password; text: webdav-password; }
-                }
-                HorizontalLayout { spacing: 8px; alignment: start;
-                    Text { text: "启用"; font-size: 12px; color: Theme.text-primary; vertical-alignment: center; }
-                    Rectangle { width: 16px; height: 16px; border-radius: 3px; border-width: 1px; border-color: webdav-enabled ? Theme.accent : Theme.border-subtle; background: webdav-enabled ? Theme.accent : transparent;
-                        TouchArea { clicked => { webdav-enabled = !webdav-enabled; } }
-                        if (webdav-enabled) : Text { text: "✓"; color: Theme.bg-root; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                    Text { text: "自动同步"; font-size: 12px; color: Theme.text-primary; vertical-alignment: center; }
-                    Rectangle { width: 16px; height: 16px; border-radius: 3px; border-width: 1px; border-color: webdav-auto-sync ? Theme.accent : Theme.border-subtle; background: webdav-auto-sync ? Theme.accent : transparent;
-                        TouchArea { clicked => { webdav-auto-sync = !webdav-auto-sync; } }
-                        if (webdav-auto-sync) : Text { text: "✓"; color: Theme.bg-root; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                }
-                if (webdav-status != "") : Rectangle { height: 28px; border-radius: 4px; background: Theme.bg-hover;
-                    Text { text: webdav-status; font-size: 11px; color: Theme.text-muted; horizontal-alignment: center; vertical-alignment: center; }
-                }
-                HorizontalLayout { spacing: 8px; alignment: end;
-                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.bg-hover; border-width: 1px; border-color: Theme.border-subtle;
-                        TouchArea { clicked => { webdav-test-connection(); } }
-                        Text { text: "测试"; color: Theme.text-primary; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.accent;
-                        TouchArea { clicked => { webdav-save-settings(webdav-url-in.text, webdav-user-in.text, webdav-pass-in.text, webdav-enabled, webdav-auto-sync); } }
-                        Text { text: "保存"; color: Theme.bg-root; font-size: 12px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.success;
-                        TouchArea { clicked => { webdav-upload(); } }
-                        Text { text: "上传"; color: Theme.bg-root; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.accent;
-                        TouchArea { clicked => { webdav-download(); } }
-                        Text { text: "下载"; color: Theme.bg-root; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                    Rectangle { width: 70px; height: 28px; border-radius: 4px; border-width: 1px; border-color: Theme.border-subtle;
-                        TouchArea { clicked => { show-webdav-dialog = false; } }
-                        Text { text: "关闭"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                    }
-                }
-            }
+    WebDavDialog {
+        open: root.show-webdav-dialog;
+        url <=> root.webdav-url;
+        username <=> root.webdav-username;
+        password <=> root.webdav-password;
+        enabled <=> root.webdav-enabled;
+        auto-sync <=> root.webdav-auto-sync;
+        status <=> root.webdav-status;
+        busy <=> root.webdav-busy;
+        test-connection => { root.webdav-test-connection(); }
+        upload => { root.webdav-upload(); }
+        download => { root.webdav-download(); }
+        save(url, user, pass, en, auto) => {
+            root.webdav-save-settings(url, user, pass, en, auto);
         }
+        cancel => { root.show-webdav-dialog = false; }
     }
 }
