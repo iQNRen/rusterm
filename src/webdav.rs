@@ -91,12 +91,14 @@ fn build_client() -> Result<reqwest::Client> {
 
 pub async fn test_connection(settings: &WebDavSettings) -> Result<()> {
     let client = build_client()?;
+    let url = &settings.base_url;
+    tracing::info!("PROPFIND {} user={}", url, settings.username);
     let propfind_body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:prop><D:resourcetype/></D:prop>
 </D:propfind>"#;
     let resp = client
-        .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &settings.base_url)
+        .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), url)
         .basic_auth(&settings.username, Some(&settings.password))
         .header("Depth", "0")
         .header("Content-Type", "application/xml")
@@ -105,10 +107,11 @@ pub async fn test_connection(settings: &WebDavSettings) -> Result<()> {
         .await
         .context("failed to send PROPFIND request")?;
     let status = resp.status();
+    let body = resp.text().await.unwrap_or_default();
+    tracing::info!("PROPFIND response: {} {}", status.as_u16(), &body[..body.len().min(200)]);
     if status.is_success() || status.as_u16() == 207 {
         Ok(())
     } else {
-        let body = resp.text().await.unwrap_or_default();
         bail!("WebDAV PROPFIND failed: {} {}", status.as_u16(), body);
     }
 }
@@ -174,17 +177,20 @@ pub async fn download(settings: &WebDavSettings) -> Result<String> {
 
 pub async fn create_collection(settings: &WebDavSettings) -> Result<()> {
     let client = build_client()?;
+    let url = settings.base_url.trim_end_matches('/');
+    tracing::info!("MKCOL {}", url);
     let resp = client
-        .request(reqwest::Method::from_bytes(b"MKCOL").unwrap(), &settings.base_url)
+        .request(reqwest::Method::from_bytes(b"MKCOL").unwrap(), url)
         .basic_auth(&settings.username, Some(&settings.password))
         .send()
         .await
         .context("failed to send MKCOL request")?;
     let status = resp.status();
+    let body = resp.text().await.unwrap_or_default();
+    tracing::info!("MKCOL response: {} {}", status.as_u16(), body);
     if status.is_success() || status.as_u16() == 405 {
         Ok(())
     } else {
-        let body = resp.text().await.unwrap_or_default();
         bail!("WebDAV MKCOL failed: {} {}", status.as_u16(), body);
     }
 }
