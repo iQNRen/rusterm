@@ -833,14 +833,41 @@ pub fn run() -> Result<()> {
                 Err(e) => { w.set_webdav_status(format!("{e}").into()); w.set_webdav_busy(false); return; }
             };
             let weak2 = weak.clone();
+            // store_dl 和 sessions_model_dl 不能 Send，所以不传进线程
+            // 线程只传 Send 类型（weak2 是 Send 的）
             std::thread::spawn(move || {
                 let rt = tokio::runtime::Runtime::new().unwrap();
                 let r = rt.block_on(crate::webdav::download(&settings));
+                let result_msg = match r {
+                    Ok(_) => "ok".to_string(),
+                    Err(e) => format!("fail:{e}"),
+                };
+                // 用 invoke_from_event_loop 回主线程，只传 Send 类型
                 slint::invoke_from_event_loop(move || {
                     if let Some(w) = weak2.upgrade() {
-                        match r {
-                            Ok(h) => w.set_webdav_status(format!("download ok (sha256: {}…)", &h[..16]).into()),
-                            Err(e) => w.set_webdav_status(format!("download fail: {e}").into()),
+                        if result_msg == "ok" {
+                            // 重载配置（在主线程，可以安全创建新 ConfigStore）
+                            match crate::config::ConfigStore::load() {
+                                Ok(new_store) => {
+                                    // 直接设置窗口属性（不更新全局 store，下次启动生效）
+                                    let is_dark = match new_store.theme_pref() {
+                                        "light" => false,
+                                        "dark" => true,
+                                        _ => true,
+                                    };
+                                    w.set_dark_mode(is_dark);
+                                    crate::i18n::set_language(new_store.language());
+                                    crate::i18n::apply_to_slint();
+                                    w.set_lang_en(crate::i18n::is_en());
+                                    w.set_webdav_status("下载成功，已自动应用 ✓".into());
+                                }
+                                Err(e) => {
+                                    w.set_webdav_status(format!("下载成功但重载失败: {e}").into());
+                                }
+                            }
+                        } else {
+                            let err = result_msg.strip_prefix("fail:").unwrap_or(&result_msg);
+                            w.set_webdav_status(format!("下载失败: {err}").into());
                         }
                         w.set_webdav_busy(false);
                     }
