@@ -589,10 +589,32 @@ export component AppWindow inherits Window {
             vertical-alignment: center;
         }
     }
+    // WebDAV sync — left of download.
+    Rectangle {
+        x: root.width - 94px;
+        y: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: Theme.radius-sm;
+        background: webdav-btn-ta.has-hover || root.show-webdav-dialog ? Theme.bg-hover : transparent;
+        webdav-btn-ta := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                webdav-open-dialog();
+            }
+        }
+        Text {
+            text: "☁";
+            color: Theme.text-secondary;
+            font-size: Theme.fs-md;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
     // Theme toggle (sun = currently dark → click for light;
     //               moon = currently light → click for dark) — left of download.
     Rectangle {
-        x: root.width - 94px;
+        x: root.width - 124px;
         y: 8px;
         width: 26px;
         height: 26px;
