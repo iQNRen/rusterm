@@ -1,7 +1,7 @@
 import { Theme } from "theme.slint";
 import { LabeledInput, PrimaryButton, GhostButton } from "widgets.slint";
 
-// 关闭按钮组件（X 图标，hover 时变红）
+// 关闭按钮组件（Material Icons 关闭图标，hover 时变红）
 component CloseButton inherits Rectangle {
     callback clicked();
     width: 28px;
@@ -15,9 +15,10 @@ component CloseButton inherits Rectangle {
     }
 
     Text {
-        text: "✕";
+        text: "\u{E5CD}";               // Material Icons close
+        font-family: "Material Icons";
         color: touch.has-hover ? Theme.danger : Theme.text-muted;
-        font-size: 16px;
+        font-size: 18px;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
