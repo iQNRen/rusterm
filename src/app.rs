@@ -239,6 +239,43 @@ pub fn run() -> Result<()> {
     // Populate the Interface font picker with installed monospace families.
     window.set_term_fonts(ModelRc::from(Rc::new(VecModel::from(system_monospace_fonts()))));
 
+    // 预设终端背景色（深色系为主，适合终端使用）
+    let bg_presets: Vec<slint::Brush> = vec![
+        slint::Color::from_rgb_u8(0x1a, 0x1b, 0x26).into(),  // Tokyo Night
+        slint::Color::from_rgb_u8(0x28, 0x2a, 0x36).into(),  // Dracula
+        slint::Color::from_rgb_u8(0x00, 0x2b, 0x36).into(),  // Solarized Dark
+        slint::Color::from_rgb_u8(0x2d, 0x2d, 0x2d).into(),  // Monokai
+        slint::Color::from_rgb_u8(0x1e, 0x1e, 0x2e).into(),  // Catppuccin
+        slint::Color::from_rgb_u8(0x0d, 0x11, 0x17).into(),  // GitHub Dark
+        slint::Color::from_rgb_u8(0x30, 0x0a, 0x24).into(),  // 紫罗兰
+        slint::Color::from_rgb_u8(0x0a, 0x19, 0x29).into(),  // 深海蓝
+    ];
+    window.set_bg_color_presets(ModelRc::from(Rc::new(VecModel::from(bg_presets))));
+
+    // 从配置加载终端背景设置
+    {
+        let s = store.borrow();
+        // 背景色
+        let bg_color = s.term_bg_color();
+        if !bg_color.is_empty() {
+            if let Some(c) = parse_hex_color(bg_color) {
+                window.set_term_bg_override(c.into());
+            }
+        }
+        // 背景图片
+        let bg_image = s.term_bg_image();
+        if !bg_image.is_empty() {
+            let path = std::path::Path::new(bg_image);
+            if path.exists() {
+                if let Ok(img) = slint::Image::load_from_path(path) {
+                    window.set_term_bg_image_src(img);
+                }
+            }
+        }
+        // 透明度
+        window.set_term_bg_opacity(s.term_bg_opacity());
+    }
+
     // Command bar (#55): seed quick commands + history from the config.
     window.set_quick_commands(quick_cmd_model(&store.borrow()));
     window.set_command_history(history_model(&store.borrow()));
@@ -333,6 +370,88 @@ pub fn run() -> Result<()> {
             }
             if let Some(w) = weak.upgrade() {
                 w.set_term_font_size(size as f32);
+            }
+        });
+    }
+
+    // 终端背景自定义回调
+    {
+        // 预设颜色值（与上面 bg_presets 顺序一致）
+        let preset_colors = vec![
+            "#1a1b26", "#282a36", "#002b36", "#2d2d2d",
+            "#1e1e2e", "#0d1117", "#300a24", "#0a1929",
+        ];
+        let weak = window.as_weak();
+        let store = store.clone();
+        window.on_set_term_bg_color(move |idx: i32| {
+            let (hex, brush) = if idx < 0 || idx as usize >= preset_colors.len() {
+                // 默认色（清空自定义）
+                ("".to_string(), slint::Brush::default())
+            } else {
+                let h = preset_colors[idx as usize];
+                let c = parse_hex_color(h).unwrap();
+                (h.to_string(), c.into())
+            };
+            {
+                let mut s = store.borrow_mut();
+                s.set_term_bg_color(hex);
+                let _ = s.save();
+            }
+            if let Some(w) = weak.upgrade() {
+                w.set_term_bg_override(brush);
+            }
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let store = store.clone();
+        window.on_set_term_bg_opacity(move |opacity: f32| {
+            let v = opacity.clamp(0.0, 1.0);
+            {
+                let mut s = store.borrow_mut();
+                s.set_term_bg_opacity(v);
+                let _ = s.save();
+            }
+            if let Some(w) = weak.upgrade() {
+                w.set_term_bg_opacity(v);
+            }
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let store = store.clone();
+        window.on_pick_bg_image(move || {
+            // 打开文件选择器，选择图片
+            let dialog = rfd::FileDialog::new()
+                .set_title("选择背景图片")
+                .add_filter("图片", &["png", "jpg", "jpeg", "webp", "bmp", "gif"])
+                .pick_file();
+            if let Some(path) = dialog {
+                let path_str = path.to_string_lossy().to_string();
+                if let Ok(img) = slint::Image::load_from_path(&path) {
+                    {
+                        let mut s = store.borrow_mut();
+                        s.set_term_bg_image(path_str);
+                        let _ = s.save();
+                    }
+                    if let Some(w) = weak.upgrade() {
+                        w.set_term_bg_image_src(img);
+                    }
+                }
+            }
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let store = store.clone();
+        window.on_clear_bg_image(move || {
+            {
+                let mut s = store.borrow_mut();
+                s.set_term_bg_image(String::new());
+                let _ = s.save();
+            }
+            if let Some(w) = weak.upgrade() {
+                w.set_term_bg_image_src(slint::Image::default());
             }
         });
     }
@@ -3804,6 +3923,19 @@ fn line_numbers_for(content: &str) -> String {
         let _ = write!(s, "{i}");
     }
     s
+}
+
+/// 解析 hex 颜色字符串（如 "#1a1b26"）为 slint::Color
+fn parse_hex_color(hex: &str) -> Option<slint::Color> {
+    let hex = hex.trim_start_matches('#');
+    if hex.len() == 6 {
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        Some(slint::Color::from_rgb_u8(r, g, b))
+    } else {
+        None
+    }
 }
 
 /// Write `text` to the system clipboard. Call from a dedicated thread, never the

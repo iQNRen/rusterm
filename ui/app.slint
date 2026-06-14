@@ -133,6 +133,16 @@ export component AppWindow inherits Window {
     in-out property <length> term-font-size <=> Theme.term-font-size;
     in-out property <string> ui-font-family <=> Theme.ui-font-family;
     in property <[string]> term-fonts;             // installed monospace families
+
+    // 终端背景自定义
+    in-out property <brush> term-bg-override <=> Theme.term-bg-override;  // 自定义背景色
+    in-out property <image> term-bg-image-src <=> Theme.term-bg-image-src; // 背景图片
+    in-out property <float> term-bg-opacity <=> Theme.term-bg-opacity;     // 背景图透明度
+    in property <[brush]> bg-color-presets;        // 预设背景色列表
+    callback set-term-bg-color(int);               // 设置自定义背景色（索引，-1=默认）
+    callback set-term-bg-opacity(float);           // 设置背景图透明度
+    callback pick-bg-image();                      // 打开文件选择器
+    callback clear-bg-image();                     // 清除背景图
     in-out property <bool> interface-open: false;  // Interface settings dialog
     // Interface dialog position (draggable by its title bar); init centered.
     property <length> ifd-x: (root.width - 644px) / 2;
@@ -1932,6 +1942,26 @@ export component AppWindow inherits Window {
                                            vertical-alignment: center; horizontal-stretch: 1; }
                                 }
                             }
+                            // 终端背景设置页
+                            Rectangle {
+                                height: 30px;
+                                border-radius: Theme.radius-sm;
+                                background: root.ifd-page == "terminal"
+                                    ? Theme.bg-active
+                                    : (nav-term-ta.has-hover ? Theme.bg-hover : transparent);
+                                nav-term-ta := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.ifd-page = "terminal"; }
+                                }
+                                HorizontalLayout {
+                                    padding-left: 10px; spacing: 8px;
+                                    Text { text: "\u{E3AE}"; font-family: "Material Icons"; // wallpaper
+                                           color: Theme.text-primary; font-size: Theme.fs-sm; vertical-alignment: center; }
+                                    Text { text: root.lang-en ? "Terminal" : "终端";
+                                           color: Theme.text-primary; font-size: Theme.fs-md;
+                                           vertical-alignment: center; horizontal-stretch: 1; }
+                                }
+                            }
                         }
                     }
                     Rectangle {
@@ -2073,6 +2103,194 @@ export component AppWindow inherits Window {
                                     : "勾选后,每次下载都会询问保存位置,而不是直接保存到预设的下载目录。";
                                 color: Theme.text-muted;
                                 font-size: Theme.fs-sm;
+                                wrap: word-wrap;
+                            }
+                        }
+
+                        // 终端背景设置页
+                        if root.ifd-page == "terminal" : VerticalLayout {
+                            padding: 18px;
+                            spacing: 16px;
+                            alignment: start;
+
+                            // 预设背景色
+                            VerticalLayout {
+                                spacing: 6px;
+                                Text {
+                                    text: root.lang-en ? "Background Color" : "背景颜色";
+                                    color: Theme.text-secondary;
+                                    font-size: Theme.fs-sm;
+                                }
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    // 默认色按钮
+                                    Rectangle {
+                                        width: 28px; height: 28px;
+                                        border-radius: 4px;
+                                        border-width: 2px;
+                                        border-color: root.term-bg-override == transparent ? Theme.accent : Theme.border-subtle;
+                                        background: Theme.term-bg;
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.set-term-bg-color(-1); }
+                                        }
+                                    }
+                                    // 预设色按钮
+                                    for color[i] in root.bg-color-presets : Rectangle {
+                                        width: 28px; height: 28px;
+                                        border-radius: 4px;
+                                        border-width: 2px;
+                                        border-color: root.term-bg-override == color ? Theme.accent : Theme.border-subtle;
+                                        background: color;
+                                        TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.set-term-bg-color(i); }
+                                        }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                }
+                            }
+
+                            // 背景图片
+                            VerticalLayout {
+                                spacing: 6px;
+                                Text {
+                                    text: root.lang-en ? "Background Image" : "背景图片";
+                                    color: Theme.text-secondary;
+                                    font-size: Theme.fs-sm;
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    // 选择图片按钮
+                                    Rectangle {
+                                        width: 100px; height: 28px;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: 1px;
+                                        border-color: Theme.border-subtle;
+                                        background: bg-pick-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                        bg-pick-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.pick-bg-image(); }
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 4px;
+                                            alignment: center;
+                                            Text {
+                                                text: "\u{E2C6}"; // add_photo_alternate
+                                                font-family: "Material Icons";
+                                                color: Theme.text-secondary;
+                                                font-size: 14px;
+                                                vertical-alignment: center;
+                                            }
+                                            Text {
+                                                text: root.lang-en ? "Choose" : "选择图片";
+                                                color: Theme.text-primary;
+                                                font-size: Theme.fs-sm;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                    // 清除图片按钮
+                                    Rectangle {
+                                        width: 80px; height: 28px;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: 1px;
+                                        border-color: Theme.border-subtle;
+                                        background: bg-clear-ta.has-hover ? Theme.danger.with-alpha(0.15) : Theme.bg-elevated;
+                                        bg-clear-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.clear-bg-image(); }
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 4px;
+                                            alignment: center;
+                                            Text {
+                                                text: "\u{E15C}"; // delete
+                                                font-family: "Material Icons";
+                                                color: bg-clear-ta.has-hover ? Theme.danger : Theme.text-secondary;
+                                                font-size: 14px;
+                                                vertical-alignment: center;
+                                            }
+                                            Text {
+                                                text: root.lang-en ? "Clear" : "清除";
+                                                color: bg-clear-ta.has-hover ? Theme.danger : Theme.text-primary;
+                                                font-size: Theme.fs-sm;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                }
+                            }
+
+                            // 透明度控制（用 +/- 按钮代替 Slider）
+                            VerticalLayout {
+                                spacing: 6px;
+                                Text {
+                                    text: root.lang-en ? "Image Opacity" : "图片透明度";
+                                    color: Theme.text-secondary;
+                                    font-size: Theme.fs-sm;
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    // 减少按钮
+                                    Rectangle {
+                                        width: 28px; height: 28px;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: 1px;
+                                        border-color: Theme.border-subtle;
+                                        background: op-minus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                        op-minus-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.set-term-bg-opacity(Math.max(0.0, root.term-bg-opacity - 0.1)); }
+                                        }
+                                        Text {
+                                            text: "−";
+                                            color: Theme.text-primary;
+                                            font-size: Theme.fs-md;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    // 当前值
+                                    Text {
+                                        text: Math.round(root.term-bg-opacity * 100) + "%";
+                                        color: Theme.text-muted;
+                                        font-size: Theme.fs-sm;
+                                        vertical-alignment: center;
+                                        width: 40px;
+                                        horizontal-alignment: center;
+                                    }
+                                    // 增加按钮
+                                    Rectangle {
+                                        width: 28px; height: 28px;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: 1px;
+                                        border-color: Theme.border-subtle;
+                                        background: op-plus-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                                        op-plus-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.set-term-bg-opacity(Math.min(1.0, root.term-bg-opacity + 0.1)); }
+                                        }
+                                        Text {
+                                            text: "+";
+                                            color: Theme.text-primary;
+                                            font-size: Theme.fs-md;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    Rectangle { horizontal-stretch: 1; }
+                                }
+                            }
+
+                            // 说明文字
+                            Text {
+                                text: root.lang-en
+                                    ? "Background image overlays on top of the background color. Adjust opacity to make terminal text readable."
+                                    : "背景图片叠加在背景色之上，调节透明度使终端文字清晰可读。";
+                                color: Theme.text-muted;
+                                font-size: Theme.fs-xs;
                                 wrap: word-wrap;
                             }
                         }

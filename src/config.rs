@@ -298,6 +298,19 @@ pub struct ConfigFile {
     /// Collapse the bottom SFTP panel on startup (#78).
     #[serde(default)]
     pub collapse_sftp_default: bool,
+    /// 自定义终端背景颜色（hex，如 "#1a1b26"）。空字符串表示使用默认主题色。
+    #[serde(default)]
+    pub term_bg_color: String,
+    /// 终端背景图片路径。空字符串表示不使用背景图。
+    #[serde(default)]
+    pub term_bg_image: String,
+    /// 终端背景图片透明度（0.0~1.0）。0 表示完全透明，1 表示完全不透明。
+    #[serde(default = "default_bg_opacity")]
+    pub term_bg_opacity: f32,
+}
+
+fn default_bg_opacity() -> f32 {
+    0.3
 }
 
 /// Portable export file (issue #46): sessions with everything in plaintext
@@ -542,6 +555,30 @@ impl ConfigStore {
 
     pub fn set_font_size(&mut self, size: u32) {
         self.cache.font_size = size.clamp(8, 32);
+    }
+
+    /// 自定义终端背景颜色（hex 字符串，如 "#1a1b26"）。空字符串 = 使用默认。
+    pub fn term_bg_color(&self) -> &str {
+        &self.cache.term_bg_color
+    }
+    pub fn set_term_bg_color(&mut self, color: String) {
+        self.cache.term_bg_color = color;
+    }
+
+    /// 终端背景图片路径。空字符串 = 不使用背景图。
+    pub fn term_bg_image(&self) -> &str {
+        &self.cache.term_bg_image
+    }
+    pub fn set_term_bg_image(&mut self, path: String) {
+        self.cache.term_bg_image = path;
+    }
+
+    /// 终端背景图片透明度（0.0~1.0）。
+    pub fn term_bg_opacity(&self) -> f32 {
+        self.cache.term_bg_opacity
+    }
+    pub fn set_term_bg_opacity(&mut self, opacity: f32) {
+        self.cache.term_bg_opacity = opacity.clamp(0.0, 1.0);
     }
 
     /// Whether the SFTP panel follows the terminal's cd (default true).

@@ -150,8 +150,18 @@ export component TerminalView inherits Rectangle {
     property <int> autoscroll-dir: 0;
     property <length> vis-y: 0px;   // scratch: cursor Y within the visible viewport
 
-    background: Theme.term-bg;
+    // 背景：优先用自定义色，否则用主题默认色
+    background: Theme.term-bg-override != transparent ? Theme.term-bg-override : Theme.term-bg;
     forward-focus: ime-input;
+
+    // 背景图片（Rust 侧加载后传入）
+    bg-image := Image {
+        source: Theme.term-bg-image-src;
+        width: root.width;
+        height: root.height;
+        image-fit: cover;
+        opacity: Theme.term-bg-opacity;
+    }
 
     // Drag state (private)
     property <bool>   sftp-dragging:     false;

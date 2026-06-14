@@ -42,6 +42,11 @@ export global Theme {
     out property <brush> term-bg: dark ? #0e0f13 : #fafafa;
     out property <brush> term-fg: dark ? #d4d4d4 : #2d2d2f;
 
+    // 自定义终端背景（Rust 侧设置，Slint 直接使用）
+    in property <brush> term-bg-override: transparent;  // 自定义背景色（transparent = 用默认）
+    in property <image> term-bg-image-src;               // 背景图片（Rust 加载后传入）
+    in property <float> term-bg-opacity: 0.3;            // 背景图透明度
+
     // --- Typography --------------------------------------------------------
     out property <length> fs-xs: 11px;
     out property <length> fs-sm: 12px;
