@@ -1683,6 +1683,7 @@ fn wire_session_callbacks(
             terminals_model.push(TerminalState {
                 id: tab_id.clone().into(),
                 status: t("连接中...", "Connecting...").into(),
+                host_info: conn_label.clone().into(),  // 连接信息，显示在状态栏
                 spans: ModelRc::from(std::rc::Rc::new(VecModel::<TermSpan>::default())),
                 cursor_row: 0,
                 cursor_col: 0,

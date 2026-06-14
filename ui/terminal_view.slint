@@ -79,6 +79,7 @@ component MenuItem inherits Rectangle {
 export component TerminalView inherits Rectangle {
     in property <string> tab-id;
     in property <string> status-line: @tr("Not connected");
+    in property <string> host-info: "";  // 连接信息，如 "root@192.168.100.2:22"
     in property <[TermSpan]> spans;     // coloured runs of the visible screen
     in property <int> cursor-row;       // cursor cell (grid coords)
     in property <int> cursor-col;
@@ -244,18 +245,47 @@ export component TerminalView inherits Rectangle {
             background: Theme.bg-panel-alt;
             HorizontalLayout {
                 padding-left: 10px; padding-right: 10px;
+                spacing: 8px;
                 Text {
                     text: root.status-line;
                     color: Theme.text-secondary;
                     font-size: Theme.fs-xs;
                     vertical-alignment: center;
-                    horizontal-stretch: 1;
                 }
-                // Alt-screen indicator only.  IMPORTANT: never put cell-w / cell-h
-                // (a Text's preferred-size) inside another Text's `text` — doing so
-                // makes Slint compute one text layout *inside* another, which
-                // re-enters parley's FontContext RefCell and panics ("already
-                // borrowed").  A plain bool flag is safe.
+                // 连接信息（user@host:port），点击复制到剪贴板
+                if root.host-info != "" : Rectangle {
+                    width: host-label.preferred-width + 24px;
+                    height: 18px;
+                    border-radius: 3px;
+                    background: host-touch.has-hover ? Theme.bg-hover : transparent;
+                    border-color: Theme.border-subtle;
+                    border-width: 1px;
+                    HorizontalLayout {
+                        padding-left: 6px; padding-right: 4px;
+                        spacing: 2px;
+                        Text {
+                            // 复制图标（content_copy）
+                            text: "\u{E157}";
+                            font-family: "Material Icons";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                        host-label := Text {
+                            text: root.host-info;
+                            color: Theme.accent;
+                            font-size: Theme.fs-xs;
+                            vertical-alignment: center;
+                        }
+                    }
+                    host-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.copy-text(root.host-info); }
+                    }
+                }
+                // spacer
+                Rectangle { horizontal-stretch: 1; }
+                // Alt-screen indicator only.
                 if root.is-alt-screen : Text {
                     text: "[ALT]";
                     color: Theme.success;

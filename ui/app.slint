@@ -49,6 +49,7 @@ export struct ProcRow {
 export struct TerminalState {
     id: string,
     status: string,
+    host-info: string,  // 连接信息，如 "root@192.168.100.2:22"，点击可复制
     spans: [TermSpan],     // coloured runs of the visible terminal screen
     cursor-row: int,       // cursor cell on the grid
     cursor-col: int,
@@ -457,6 +458,7 @@ export component AppWindow inherits Window {
                     height: term.id == root.active-tab-id ? parent.height : 0px;
                     tab-id: term.id;
                     status-line: term.status;
+                    host-info: term.host-info;
                     spans: term.spans;
                     cursor-row: term.cursor-row;
                     cursor-col: term.cursor-col;
