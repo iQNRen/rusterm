@@ -24,31 +24,8 @@ component CloseButton inherits Rectangle {
     }
 }
 
-// Toast 提示组件（自动隐藏，2秒后消失）
-component Toast inherits Rectangle {
-    in property <string> text;
-    in property <bool> show: false;
-    height: show ? 32px : 0px;
-    opacity: show ? 1.0 : 0.0;
-    border-radius: Theme.radius-sm;
-    background: Theme.bg-elevated;
-
-    // 弹出动画（淡入）
-    animate opacity { duration: 200ms; easing: ease-out; }
-    animate height { duration: 200ms; easing: ease-out; }
-
-    Text {
-        x: 12px;
-        width: parent.width - 24px;
-        text: root.text;
-        color: Theme.text-secondary;
-        font-size: Theme.fs-sm;
-        vertical-alignment: center;
-        overflow: elide;
-    }
-}
-
 // WebDAV 同步设置对话框
+// Toast 提示由外部 AppWindow 控制（不在此组件内）
 export component WebDavDialog inherits Rectangle {
     // ── 对外属性 ──
     in-out property <bool> open: false;
@@ -57,11 +34,7 @@ export component WebDavDialog inherits Rectangle {
     in-out property <string> password: "";
     in-out property <bool> enabled: false;
     in-out property <bool> auto-sync: false;
-    in-out property <string> status: "";        // Toast 内容，非空时显示
     in-out property <bool> busy: false;
-
-    // 内部状态：控制 Toast 显示
-    in-out property <bool> toast-visible: false;
 
     // ── 对外回调 ──
     callback test-connection();
@@ -69,25 +42,6 @@ export component WebDavDialog inherits Rectangle {
     callback download();
     callback save(string, string, string, bool, bool);
     callback cancel();
-
-    // Toast 定时器：2秒后隐藏
-    hide-timer := Timer {
-        interval: 2s;
-        running: root.toast-visible;
-        triggered => {
-            root.toast-visible = false;
-        }
-    }
-
-    // 当 status 变化时，自动显示 Toast
-    changed status => {
-        if (root.status != "") {
-            root.toast-visible = true;
-            // 重启定时器
-            hide-timer.running = false;
-            hide-timer.running = true;
-        }
-    }
 
     visible: open;
     width: 100%;
@@ -97,7 +51,7 @@ export component WebDavDialog inherits Rectangle {
     // 对话框主体
     dialog-box := Rectangle {
         width: parent.width.min(420px).max(320px) - 32px;
-        height: parent.height.min(520px) - 32px;
+        height: parent.height.min(420px) - 32px;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         border-radius: Theme.radius-lg;
@@ -134,115 +88,106 @@ export component WebDavDialog inherits Rectangle {
                 background: Theme.border-subtle;
             }
 
-            // ── 表单区域（可滚动） ──
-            Flickable {
-                vertical-stretch: 1;
-                viewport-width: self.width;
-                viewport-height: form-layout.preferred-height;
+            // ── 表单区域 ──
+            VerticalLayout {
+                spacing: 12px;
 
-                form-layout := VerticalLayout {
-                    spacing: 12px;
+                LabeledInput {
+                    label: "服务器地址";
+                    placeholder: "https://dav.jianguoyun.com/dav/your-path/";
+                    value <=> root.url;
+                }
 
-                    LabeledInput {
-                        label: "服务器地址";
-                        placeholder: "https://dav.jianguoyun.com/dav/your-path/";
-                        value <=> root.url;
-                    }
+                LabeledInput {
+                    label: "用户名";
+                    placeholder: "坚果云邮箱";
+                    value <=> root.username;
+                }
 
-                    LabeledInput {
-                        label: "用户名";
-                        placeholder: "坚果云邮箱";
-                        value <=> root.username;
-                    }
+                LabeledInput {
+                    label: "应用密码";
+                    placeholder: "第三方应用专用密码（非登录密码）";
+                    value <=> root.password;
+                    password: true;
+                }
 
-                    LabeledInput {
-                        label: "应用密码";
-                        placeholder: "第三方应用专用密码（非登录密码）";
-                        value <=> root.password;
-                        password: true;
-                    }
+                // ── 开关选项 ──
+                HorizontalLayout {
+                    spacing: 16px;
+                    height: 32px;
 
-                    // ── 开关选项 ──
+                    // 启用同步
                     HorizontalLayout {
-                        spacing: 16px;
-                        height: 32px;
+                        spacing: 8px;
+                        alignment: start;
+                        horizontal-stretch: 1;
 
-                        // 启用同步
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: start;
-                            horizontal-stretch: 1;
-
-                            Rectangle {
-                                width: 18px;
-                                height: 18px;
-                                border-radius: 4px;
-                                border-width: 1px;
-                                border-color: root.enabled ? Theme.accent : Theme.border-subtle;
-                                background: root.enabled ? Theme.accent : Theme.bg-root;
-                                y: (parent.height - self.height) / 2;
-                                TouchArea {
-                                    mouse-cursor: pointer;
-                                    clicked => { root.enabled = !root.enabled; }
-                                }
-                                if root.enabled : Text {
-                                    text: "✓";
-                                    color: white;
-                                    font-size: 11px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
+                        Rectangle {
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: root.enabled ? Theme.accent : Theme.border-subtle;
+                            background: root.enabled ? Theme.accent : Theme.bg-root;
+                            y: (parent.height - self.height) / 2;
+                            TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.enabled = !root.enabled; }
                             }
-                            Text {
-                                text: "启用同步";
-                                color: Theme.text-primary;
-                                font-size: Theme.fs-sm;
+                            if root.enabled : Text {
+                                text: "✓";
+                                color: white;
+                                font-size: 11px;
+                                horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
                         }
-
-                        // 自动同步
-                        HorizontalLayout {
-                            spacing: 8px;
-                            alignment: start;
-                            horizontal-stretch: 1;
-
-                            Rectangle {
-                                width: 18px;
-                                height: 18px;
-                                border-radius: 4px;
-                                border-width: 1px;
-                                border-color: root.auto-sync ? Theme.accent : Theme.border-subtle;
-                                background: root.auto-sync ? Theme.accent : Theme.bg-root;
-                                y: (parent.height - self.height) / 2;
-                                TouchArea {
-                                    mouse-cursor: pointer;
-                                    clicked => { root.auto-sync = !root.auto-sync; }
-                                }
-                                if root.auto-sync : Text {
-                                    text: "✓";
-                                    color: white;
-                                    font-size: 11px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                            }
-                            Text {
-                                text: "自动同步";
-                                color: Theme.text-primary;
-                                font-size: Theme.fs-sm;
-                                vertical-alignment: center;
-                            }
+                        Text {
+                            text: "启用同步";
+                            color: Theme.text-primary;
+                            font-size: Theme.fs-sm;
+                            vertical-alignment: center;
                         }
                     }
 
-                    // ── Toast 提示（status 非空时弹出，2秒自动消失） ──
-                    Toast {
-                        text: root.status;
-                        show: root.toast-visible;
+                    // 自动同步
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        horizontal-stretch: 1;
+
+                        Rectangle {
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: root.auto-sync ? Theme.accent : Theme.border-subtle;
+                            background: root.auto-sync ? Theme.accent : Theme.bg-root;
+                            y: (parent.height - self.height) / 2;
+                            TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.auto-sync = !root.auto-sync; }
+                            }
+                            if root.auto-sync : Text {
+                                text: "✓";
+                                color: white;
+                                font-size: 11px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                        Text {
+                            text: "自动同步";
+                            color: Theme.text-primary;
+                            font-size: Theme.fs-sm;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }
+
+            // ── 弹性空间（把按钮推到底部） ──
+            Rectangle { vertical-stretch: 1; }
 
             // ── 分割线 ──
             Rectangle {

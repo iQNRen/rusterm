@@ -2225,7 +2225,6 @@ export component AppWindow inherits Window {
         password <=> root.webdav-password;
         enabled <=> root.webdav-enabled;
         auto-sync <=> root.webdav-auto-sync;
-        status <=> root.webdav-status;
         busy <=> root.webdav-busy;
         test-connection => { root.webdav-test-connection(); }
         upload => { root.webdav-upload(); }
@@ -2235,4 +2234,52 @@ export component AppWindow inherits Window {
         }
         cancel => { root.show-webdav-dialog = false; }
     }
+
+    // ── 全局 Toast 提示（主窗口底部弹出） ──
+    in-out property <string> toast-text: "";
+    in-out property <bool> toast-visible: false;
+
+    // Toast 定时器：2秒后自动隐藏
+    toast-hide-timer := Timer {
+        interval: 2s;
+        running: root.toast-visible;
+        triggered => {
+            root.toast-visible = false;
+        }
+    }
+
+    // 当 webdav-status 变化时，显示 Toast
+    changed webdav-status => {
+        if (root.webdav-status != "") {
+            root.toast-text = root.webdav-status;
+            root.toast-visible = true;
+            toast-hide-timer.running = false;
+            toast-hide-timer.running = true;
+        }
+    }
+
+    // Toast 浮层（固定在窗口底部居中）
+    if root.toast-visible : Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - 24px;
+        width: toast-label.preferred-width + 32px;
+        height: 36px;
+        border-radius: Theme.radius-md;
+        background: Theme.bg-elevated;
+        border-width: 1px;
+        border-color: Theme.border-subtle;
+        opacity: root.toast-visible ? 1.0 : 0.0;
+        animate opacity { duration: 200ms; easing: ease-out; }
+
+        toast-label := Text {
+            x: 16px;
+            width: parent.width - 32px;
+            text: root.toast-text;
+            color: Theme.text-primary;
+            font-size: Theme.fs-sm;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+
 }
