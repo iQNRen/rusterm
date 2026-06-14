@@ -1,6 +1,28 @@
 import { Theme } from "theme.slint";
 import { LabeledInput, PrimaryButton, GhostButton } from "widgets.slint";
 
+// 关闭按钮组件（X 图标，hover 时变红）
+component CloseButton inherits Rectangle {
+    callback clicked();
+    width: 28px;
+    height: 28px;
+    border-radius: Theme.radius-sm;
+    background: touch.has-hover ? Theme.danger.with-alpha(0.15) : transparent;
+
+    touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: "✕";
+        color: touch.has-hover ? Theme.danger : Theme.text-muted;
+        font-size: 16px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
 // WebDAV 同步设置对话框
 // 样式与 SessionDialog 保持一致，支持深色/浅色主题
 export component WebDavDialog inherits Rectangle {
@@ -26,9 +48,11 @@ export component WebDavDialog inherits Rectangle {
     height: 100%;
     background: #00000060;
 
-    // 对话框主体 - 响应式：宽度自适应父容器，最大 420px
+    // 对话框主体 - 响应式布局
     dialog-box := Rectangle {
-        width: parent.width.min(420px) - 32px;
+        // 宽度：自适应父容器，最大 420px，最小 320px
+        width: parent.width.min(420px).max(320px) - 32px;
+        // 高度：自适应父容器，最大 520px
         height: parent.height.min(520px) - 32px;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
@@ -37,40 +61,40 @@ export component WebDavDialog inherits Rectangle {
         border-width: 1px;
         border-color: Theme.border-subtle;
 
-        // 垂直布局：标题 + 内容 + 按钮
         VerticalLayout {
-            // ── 标题栏（固定高度） ──
-            padding-top: 20px;
-            padding-left: 20px;
-            padding-right: 20px;
+            padding: 20px;
+            spacing: 12px;
 
-            Text {
-                text: "WebDAV 同步";
-                font-size: Theme.fs-xl;
-                color: Theme.text-primary;
-                font-weight: 700;
+            // ── 标题栏：标题 + 关闭按钮 ──
+            HorizontalLayout {
+                height: 28px;
+                spacing: 8px;
+
+                Text {
+                    text: "WebDAV 同步";
+                    font-size: Theme.fs-xl;
+                    color: Theme.text-primary;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+
+                CloseButton {
+                    clicked => { root.cancel(); }
+                }
             }
 
             // ── 分割线 ──
             Rectangle {
                 height: 1px;
                 background: Theme.border-subtle;
-                
-                
             }
-        }
 
-        // ── 中间表单区域（可滚动，自适应高度） ──
-        Flickable {
-            y: 56px;  // 标题高度 + padding
-            height: parent.height - 56px - 60px;  // 减去标题和底部按钮
-            width: 100%;
-            viewport-width: self.width;
-            viewport-height: form-layout.preferred-height;
-
-            VerticalLayout {
-                padding-left: 20px;
-                padding-right: 20px;
+            // ── 表单区域（可滚动） ──
+            Flickable {
+                vertical-stretch: 1;
+                viewport-width: self.width;
+                viewport-height: form-layout.preferred-height;
 
                 form-layout := VerticalLayout {
                     spacing: 12px;
@@ -94,7 +118,7 @@ export component WebDavDialog inherits Rectangle {
                         password: true;
                     }
 
-                    // ── 开关选项（响应式：自动换行） ──
+                    // ── 开关选项 ──
                     HorizontalLayout {
                         spacing: 16px;
                         height: 32px;
@@ -185,24 +209,14 @@ export component WebDavDialog inherits Rectangle {
                     }
                 }
             }
-        }
 
-        // ── 底部按钮栏（固定高度） ──
-        VerticalLayout {
-            y: parent.height - 60px;
-            height: 60px;
-            padding-left: 20px;
-            padding-right: 20px;
-            padding-bottom: 16px;
-
-            // 分割线
+            // ── 分割线 ──
             Rectangle {
                 height: 1px;
                 background: Theme.border-subtle;
-                
             }
 
-            // 按钮行
+            // ── 按钮栏 ──
             HorizontalLayout {
                 spacing: 8px;
                 height: 36px;
@@ -229,11 +243,6 @@ export component WebDavDialog inherits Rectangle {
                     clicked => {
                         root.save(root.url, root.username, root.password, root.enabled, root.auto-sync);
                     }
-                }
-
-                GhostButton {
-                    text: "取消";
-                    clicked => { root.cancel(); }
                 }
             }
         }
