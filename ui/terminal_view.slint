@@ -238,25 +238,17 @@ export component TerminalView inherits Rectangle {
     VerticalLayout {
         spacing: 0;
 
-        // --- Status strip ---------------------------------------------------
-        Rectangle {
-            height: 24px;
-            background: Theme.bg-panel-alt;
-            HorizontalLayout {
-                padding-left: 10px; padding-right: 10px;
-                Text {
-                    text: root.status-line;
-                    color: Theme.text-secondary;
-                    font-size: Theme.fs-xs;
-                    vertical-alignment: center;
-                    horizontal-stretch: 1;
-                }
-                if root.is-alt-screen : Text {
-                    text: "[ALT]";
-                    color: Theme.success;
-                    font-size: Theme.fs-xs;
-                    vertical-alignment: center;
-                }
+        // [ALT] 悬浮标记 — 右上角，进入 vim/nano/htop 时显示
+        if root.is-alt-screen : Rectangle {
+            height: 0px;
+            // 用 overlay 方式放在右上角
+            Text {
+                text: "[ALT]";
+                color: Theme.success;
+                font-size: Theme.fs-xs;
+                x: root.width - self.width - 8px;
+                y: 2px;
+                opacity: 0.7;
             }
         }
 
