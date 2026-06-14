@@ -1,7 +1,7 @@
 fn main() {
     // Bundle the gettext `.po` translations under `lang/` so the UI's `@tr(...)`
     // strings can switch language at runtime via slint::select_bundled_translation.
-    // Source language is Chinese (the msgids); `lang/<lc>/LC_MESSAGES/meatshell.po`
+    // Source language is Chinese (the msgids); `lang/<lc>/LC_MESSAGES/rusterm.po`
     // provides other locales.  No per-component context, so msgids are the raw
     // Chinese strings.
     println!("cargo:rerun-if-changed=lang");
@@ -18,9 +18,9 @@ fn main() {
     // Explorer, the taskbar and shortcuts. No-op on non-Windows targets.
     #[cfg(windows)]
     {
-        println!("cargo:rerun-if-changed=assets/meatshell.ico");
+        println!("cargo:rerun-if-changed=assets/rusterm.ico");
         let mut res = winresource::WindowsResource::new();
-        res.set_icon("assets/meatshell.ico");
+        res.set_icon("assets/rusterm.ico");
         if let Err(e) = res.compile() {
             println!("cargo:warning=failed to embed Windows icon: {e}");
         }

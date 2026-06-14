@@ -393,12 +393,12 @@ All notable changes are documented here. 本文件记录所有重要变更。
   `wayland-data-control` 后端,复制改用 set().wait() 使选区在剪贴板句柄 drop 后
   仍然有效。
 
-- **Hide the shell-integration command from the terminal.** meatshell injects a
+- **Hide the shell-integration command from the terminal.** rusterm injects a
   one-line `PROMPT_COMMAND` (OSC 7) on connect so the SFTP panel can follow the
   terminal's working directory. Its echo used to show up on every connect (and
   pollute shell history); the line now carries a leading space (kept out of
   history) and its echo is stripped from the output before display.
-  **隐藏 shell 集成注入命令。** meatshell 连接时会注入一行 `PROMPT_COMMAND`
+  **隐藏 shell 集成注入命令。** rusterm 连接时会注入一行 `PROMPT_COMMAND`
   (OSC 7),让 SFTP 面板跟随终端当前目录。此前它的回显每次连接都显示在终端
   (并污染命令历史);现在该行带前导空格(不进历史),回显也会在显示前被剥离。
 
@@ -507,10 +507,10 @@ All notable changes are documented here. 本文件记录所有重要变更。
   switched to an ASCII `+`.
   英文下「New session」前的全角 `＋` 显示为豆腐块,改用 ASCII `+`。
 
-- `install-linux.sh` now auto-detects the `meatshell` binary sitting next to it
+- `install-linux.sh` now auto-detects the `rusterm` binary sitting next to it
   in a release package, so it works with no arguments (it previously defaulted to
   the source-tree `./target/release` path and failed for end users).
-  `install-linux.sh` 现在自动识别发布包里同目录的 `meatshell`,无需传参即可使用
+  `install-linux.sh` 现在自动识别发布包里同目录的 `rusterm`,无需传参即可使用
   (之前默认指向源码树的 `./target/release`,普通用户直接跑会报错)。
 
 ## [0.2.2] - 2026-06-05
@@ -553,18 +553,18 @@ All notable changes are documented here. 本文件记录所有重要变更。
   **会话弹窗的私钥文件选择器**，并支持 `.pub` 容错（自动去后缀加载对应私钥）、
   路径分隔符统一为 `/`。
 
-- **Linux desktop integration** — `assets/meatshell.desktop` + `install-linux.sh`
+- **Linux desktop integration** — `assets/rusterm.desktop` + `install-linux.sh`
   and an `xdg_app_id` so the GNOME/Ubuntu dock shows the app icon on Wayland.
-  **Linux 桌面集成** —— `assets/meatshell.desktop` + `install-linux.sh`，并设置
+  **Linux 桌面集成** —— `assets/rusterm.desktop` + `install-linux.sh`，并设置
   `xdg_app_id`，使 Wayland 下 GNOME/Ubuntu 任务栏显示应用图标。
 
 - **Screenshots in the README** (`docs/screenshots/`, sensitive info redacted).
   **README 增加截图**（`docs/screenshots/`，敏感信息已打码）。
 
-[0.3.8]: https://github.com/jeff141/meatshell/releases/tag/v0.3.8
-[0.3.7]: https://github.com/jeff141/meatshell/releases/tag/v0.3.7
-[0.3.3]: https://github.com/jeff141/meatshell/releases/tag/v0.3.3
-[0.3.2]: https://github.com/jeff141/meatshell/releases/tag/v0.3.2
-[0.3.1]: https://github.com/jeff141/meatshell/releases/tag/v0.3.1
-[0.3.0]: https://github.com/jeff141/meatshell/releases/tag/v0.3.0
-[0.2.2]: https://github.com/jeff141/meatshell/releases/tag/v0.2.2
+[0.3.8]: https://github.com/jeff141/rusterm/releases/tag/v0.3.8
+[0.3.7]: https://github.com/jeff141/rusterm/releases/tag/v0.3.7
+[0.3.3]: https://github.com/jeff141/rusterm/releases/tag/v0.3.3
+[0.3.2]: https://github.com/jeff141/rusterm/releases/tag/v0.3.2
+[0.3.1]: https://github.com/jeff141/rusterm/releases/tag/v0.3.1
+[0.3.0]: https://github.com/jeff141/rusterm/releases/tag/v0.3.0
+[0.2.2]: https://github.com/jeff141/rusterm/releases/tag/v0.2.2

@@ -618,7 +618,7 @@ async fn run_sftp(
                 // Sanitize the remote-controlled name before it becomes a local
                 // file path that we later hand to the OS "open" call.
                 let filename = sanitize_filename(&base_name(&remote));
-                let tmp_dir = std::env::temp_dir().join("meatshell");
+                let tmp_dir = std::env::temp_dir().join("rusterm");
                 let _ = tokio::fs::create_dir_all(&tmp_dir).await;
                 let local = tmp_dir.join(&filename);
                 let local_str = local.to_string_lossy().to_string();

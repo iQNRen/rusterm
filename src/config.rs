@@ -1,8 +1,8 @@
 //! Session / application configuration.
 //!
 //! Persists a simple JSON file under the platform's standard config dir
-//! (e.g. `%APPDATA%/meatshell/sessions.json` on Windows,
-//!  `~/.config/meatshell/sessions.json` on Linux/macOS).
+//! (e.g. `%APPDATA%/rusterm/sessions.json` on Windows,
+//!  `~/.config/rusterm/sessions.json` on Linux/macOS).
 //!
 //! ## Password encryption
 //!
@@ -302,7 +302,7 @@ pub struct ConfigFile {
 
 /// Portable export file (issue #46): sessions with everything in plaintext
 /// **except** the password, which is encrypted with a fixed key baked into the
-/// binary so the file opens on *any* machine running meatshell.
+/// binary so the file opens on *any* machine running rusterm.
 ///
 /// Security note: a built-in key in open-source code is **obfuscation, not real
 /// security** — anyone with the source can derive it. It only stops a casual
@@ -310,7 +310,7 @@ pub struct ConfigFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ExportFile {
     /// Format marker / version so the schema can evolve later.
-    meatshell_export: u32,
+    rusterm_export: u32,
     sessions: Vec<Session>,
 }
 
@@ -331,7 +331,7 @@ impl ConfigStore {
 
     /// Fixed 32-byte key for portable exports. Baked into the binary so an
     /// exported file decrypts on any machine. Obfuscation only — see `ExportFile`.
-    const EXPORT_KEY: [u8; 32] = *b"meatshell.export.portable.key.01";
+    const EXPORT_KEY: [u8; 32] = *b"rusterm.export.portable.key.01ab";
 
     // ── Encryption helpers ────────────────────────────────────────────────
 
@@ -453,7 +453,7 @@ impl ConfigStore {
     }
 
     fn config_path() -> Result<PathBuf> {
-        let dirs = ProjectDirs::from("dev", "meatshell", "meatshell")
+        let dirs = ProjectDirs::from("dev", "rusterm", "rusterm")
             .context("could not determine user config directory")?;
         Ok(dirs.config_dir().join("sessions.json"))
     }
@@ -732,7 +732,7 @@ impl ConfigStore {
     /// file is human-readable and editable. Returns the number of sessions.
     pub fn export_to(&self, path: &Path) -> Result<usize> {
         let mut out = ExportFile {
-            meatshell_export: 1,
+            rusterm_export: 1,
             sessions: self.cache.sessions.clone(),
         };
         for s in &mut out.sessions {
@@ -756,7 +756,7 @@ impl ConfigStore {
         let raw = fs::read_to_string(path)
             .with_context(|| format!("failed to read {}", path.display()))?;
         let file: ExportFile = serde_json::from_str(&raw)
-            .context("not a valid meatshell export file")?;
+            .context("not a valid rusterm export file")?;
 
         let mut added = 0usize;
         let mut skipped = 0usize;

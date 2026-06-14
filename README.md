@@ -1,4 +1,4 @@
-# meatshell
+# rusterm
 
 **简体中文** | [English](./README.en.md)
 
@@ -22,18 +22,18 @@ JVM 压到几十 MB 原生级别。
 ## 下载与安装
 
 每次打 `v*` 标签，GitHub Actions 会自动构建 **Windows / Linux / macOS** 三平台二进制，
-发布到 [Releases](https://github.com/jeff141/meatshell/releases) 页面。
+发布到 [Releases](https://github.com/jeff141/rusterm/releases) 页面。
 
 ### Windows
 
-下载 `meatshell-*-windows-x86_64.zip`，解压后双击 `meatshell.exe`。
+下载 `rusterm-*-windows-x86_64.zip`，解压后双击 `rusterm.exe`。
 
 ### Linux
 
 ```bash
-tar -xzf meatshell-*-linux-x86_64.tar.gz
-cd meatshell-*-linux-x86_64
-./meatshell                                  # 直接运行
+tar -xzf rusterm-*-linux-x86_64.tar.gz
+cd rusterm-*-linux-x86_64
+./rusterm                                  # 直接运行
 # 可选：装应用图标 + 启动器入口（Dock / 应用列表里显示图标，无需传参）
 chmod +x install-linux.sh && ./install-linux.sh
 ```
@@ -43,9 +43,9 @@ chmod +x install-linux.sh && ./install-linux.sh
 ### macOS
 
 ```bash
-tar -xzf meatshell-*-macos-*.tar.gz          # aarch64 = Apple 芯片，x86_64 = Intel
-xattr -dr com.apple.quarantine meatshell     # 去掉「未签名应用」的 Gatekeeper 拦截
-./meatshell
+tar -xzf rusterm-*-macos-*.tar.gz          # aarch64 = Apple 芯片，x86_64 = Intel
+xattr -dr com.apple.quarantine rusterm     # 去掉「未签名应用」的 Gatekeeper 拦截
+./rusterm
 ```
 
 > 从源码构建见下方 [运行](#运行)。
@@ -60,9 +60,9 @@ xattr -dr com.apple.quarantine meatshell     # 去掉「未签名应用」的 Ga
 - [x] 完整 VT/ANSI 终端模拟（btop / htop / vim 全屏正常渲染）
 - [x] 多标签页（欢迎页 + 多个会话）
 - [x] 会话管理：新建 / 编辑 / 删除 / 分组，本地 JSON 持久化，导出 / 导入
-  - 配置位置：`%APPDATA%/meatshell/sessions.json`（Windows）
-    / `~/.config/meatshell/sessions.json`（Linux）
-    / `~/Library/Application Support/meatshell/sessions.json`（macOS）
+  - 配置位置：`%APPDATA%/rusterm/sessions.json`（Windows）
+    / `~/.config/rusterm/sessions.json`（Linux）
+    / `~/Library/Application Support/rusterm/sessions.json`（macOS）
 - [x] SSH（`russh`，纯 Rust）：密码 / 私钥 / 加密私钥（密码短语）
 - [x] SFTP 文件浏览 + 上传 / 下载（拖拽）+ 终端内 ZMODEM（`sz`）接收
 - [x] SSH 端口转发 / 隧道：本地 -L / 远程 -R / 动态 -D（SOCKS5）
@@ -95,13 +95,13 @@ xattr -dr com.apple.quarantine meatshell     # 去掉「未签名应用」的 Ga
 cargo run --release
 ```
 
-首次启动会在 `%APPDATA%/meatshell/sessions.json` 建立空的会话库。点击右上
+首次启动会在 `%APPDATA%/rusterm/sessions.json` 建立空的会话库。点击右上
 角 **“＋ 新建会话”** 添加第一台服务器。
 
 ## 项目布局
 
 ```
-meatshell/
+rusterm/
 ├── Cargo.toml
 ├── build.rs                 # Slint 编译器入口
 ├── ui/

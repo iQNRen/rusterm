@@ -16,6 +16,7 @@ mod ssh_config;
 mod system;
 mod telnet;
 mod zmodem;
+mod webdav;
 
 fn main() -> anyhow::Result<()> {
     init_tracing();

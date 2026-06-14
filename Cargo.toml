@@ -1,11 +1,11 @@
 [package]
-name = "meatshell"
+name = "rusterm"
 version = "0.4.3"
 edition = "2021"
-authors = ["meatshell contributors"]
+authors = ["rusterm contributors"]
 description = "A lightweight FinalShell-style SSH/terminal client written in Rust + Slint"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/your/meatshell"
+repository = "https://github.com/your/rusterm"
 readme = "README.md"
 rust-version = "1.75"
 
@@ -40,6 +40,8 @@ zeroize = "1"
 # SOCKS5 proxy tunnelling for SSH/SFTP in network-restricted environments.
 # (HTTP CONNECT proxies are handled in src/proxy.rs without an extra crate.)
 tokio-socks = "0.5"
+reqwest = { version = "0.12", features = ["json"] }
+sha2 = "0.10"
 base64 = "0.22"
 # Enumerate installed system fonts for the Interface (font) settings picker.
 fontdb = "0.16"
@@ -68,10 +70,11 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 # Feature is additive over the base `arboard = "3"` dependency above.
 arboard = { version = "3", features = ["wayland-data-control"] }
 
+
 [build-dependencies]
 slint-build = "1.8"
 
-# Embeds assets/meatshell.ico into the .exe so Explorer / taskbar / shortcuts
+# Embeds assets/rusterm.ico into the .exe so Explorer / taskbar / shortcuts
 # show the app icon. Windows-only; ignored on other targets.
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"

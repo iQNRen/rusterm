@@ -65,7 +65,7 @@ export struct TerminalState {
 }
 
 export component AppWindow inherits Window {
-    title: "meatshell";
+    title: "rusterm";
     icon: @image-url("../assets/icon.png");
     min-width: 960px;
     min-height: 600px;
@@ -331,6 +331,21 @@ export component AppWindow inherits Window {
     callback term-select-end(string /* tab-id */);
     callback term-select-autoscroll(string /* tab-id */, int /* dir */);
 
+    // WebDAV sync
+    in-out property <bool> show-webdav-dialog: false;
+    in-out property <string> webdav-url: "";
+    in-out property <string> webdav-username: "";
+    in-out property <string> webdav-password: "";
+    in-out property <bool> webdav-enabled: false;
+    in-out property <bool> webdav-auto-sync: false;
+    in-out property <string> webdav-status: "";
+    in-out property <bool> webdav-busy: false;
+    callback webdav-test-connection();
+    callback webdav-upload();
+    callback webdav-download();
+    callback webdav-save-settings(string, string, string, bool, bool);
+    callback webdav-open-dialog();
+
     HorizontalLayout {
         spacing: 0;
 
@@ -361,6 +376,7 @@ export component AppWindow inherits Window {
             app-version: root.app-version;
             select-net-iface(i) => { root.select-net-iface(i); }
             show-processes() => { root.proc-open = true; }
+            open-webdav() => { webdav-open-dialog(); }
         }
 
         // Right side: tabs + content
@@ -1613,7 +1629,7 @@ export component AppWindow inherits Window {
                 padding: 18px;
                 spacing: 12px;
                 Text {
-                    text: root.lang-en ? "Close meatshell?" : "确定关闭 meatshell?";
+                    text: root.lang-en ? "Close rusterm?" : "确定关闭 rusterm?";
                     color: Theme.text-primary; font-size: Theme.fs-lg; font-weight: 700;
                 }
                 Text {
@@ -1948,7 +1964,7 @@ export component AppWindow inherits Window {
                                 border-color: Theme.border-subtle;
                                 Text {
                                     x: 10px;
-                                    text: "meatshell ~$ echo preview 0123";
+                                    text: "rusterm ~$ echo preview 0123";
                                     font-family: Theme.term-font-family;
                                     font-size: Theme.term-font-size;
                                     color: Theme.term-fg;
@@ -2070,7 +2086,7 @@ export component AppWindow inherits Window {
 
                 HorizontalLayout {
                     Text {
-                        text: @tr("About meatshell");
+                        text: @tr("About rusterm");
                         color: Theme.text-primary;
                         font-size: Theme.fs-lg;
                         font-weight: 700;
@@ -2177,5 +2193,69 @@ export component AppWindow inherits Window {
             root.confirm-delete-open = false;
         }
         cancel => { root.confirm-delete-open = false; }
+    }
+
+    // ── WebDAV sync dialog ──
+    if (show-webdav-dialog) : Rectangle {
+        background: #00000080;
+        Rectangle {
+            width: 380px; height: 380px;
+            border-radius: Theme.radius-md;
+            background: Theme.bg-panel;
+            border-width: 1px; border-color: Theme.border-subtle;
+            VerticalLayout {
+                padding: 20px; spacing: 12px;
+                Text { text: "WebDAV 同步"; font-size: 16px; color: Theme.text-primary; font-weight: 600; }
+                VerticalLayout { spacing: 4px;
+                    Text { text: "服务器地址"; font-size: 11px; color: Theme.text-muted; }
+                    webdav-url-in := TextInput { text: webdav-url; }
+                }
+                VerticalLayout { spacing: 4px;
+                    Text { text: "用户名"; font-size: 11px; color: Theme.text-muted; }
+                    webdav-user-in := TextInput { text: webdav-username; }
+                }
+                VerticalLayout { spacing: 4px;
+                    Text { text: "应用密码"; font-size: 11px; color: Theme.text-muted; }
+                    webdav-pass-in := TextInput { input-type: InputType.password; text: webdav-password; }
+                }
+                HorizontalLayout { spacing: 8px; alignment: start;
+                    Text { text: "启用"; font-size: 12px; color: Theme.text-primary; vertical-alignment: center; }
+                    Rectangle { width: 16px; height: 16px; border-radius: 3px; border-width: 1px; border-color: webdav-enabled ? Theme.accent : Theme.border-subtle; background: webdav-enabled ? Theme.accent : transparent;
+                        TouchArea { clicked => { webdav-enabled = !webdav-enabled; } }
+                        if (webdav-enabled) : Text { text: "✓"; color: Theme.bg-root; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Text { text: "自动同步"; font-size: 12px; color: Theme.text-primary; vertical-alignment: center; }
+                    Rectangle { width: 16px; height: 16px; border-radius: 3px; border-width: 1px; border-color: webdav-auto-sync ? Theme.accent : Theme.border-subtle; background: webdav-auto-sync ? Theme.accent : transparent;
+                        TouchArea { clicked => { webdav-auto-sync = !webdav-auto-sync; } }
+                        if (webdav-auto-sync) : Text { text: "✓"; color: Theme.bg-root; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+                if (webdav-status != "") : Rectangle { height: 28px; border-radius: 4px; background: Theme.bg-hover;
+                    Text { text: webdav-status; font-size: 11px; color: Theme.text-muted; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                HorizontalLayout { spacing: 8px; alignment: end;
+                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.bg-hover; border-width: 1px; border-color: Theme.border-subtle;
+                        TouchArea { clicked => { webdav-test-connection(); } }
+                        Text { text: "测试"; color: Theme.text-primary; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.accent;
+                        TouchArea { clicked => { webdav-save-settings(webdav-url-in.text, webdav-user-in.text, webdav-pass-in.text, webdav-enabled, webdav-auto-sync); } }
+                        Text { text: "保存"; color: Theme.bg-root; font-size: 12px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.success;
+                        TouchArea { clicked => { webdav-upload(); } }
+                        Text { text: "上传"; color: Theme.bg-root; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle { width: 70px; height: 28px; border-radius: 4px; background: Theme.accent;
+                        TouchArea { clicked => { webdav-download(); } }
+                        Text { text: "下载"; color: Theme.bg-root; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle { width: 70px; height: 28px; border-radius: 4px; border-width: 1px; border-color: Theme.border-subtle;
+                        TouchArea { clicked => { show-webdav-dialog = false; } }
+                        Text { text: "关闭"; color: Theme.text-muted; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
     }
 }

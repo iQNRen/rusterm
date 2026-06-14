@@ -180,9 +180,9 @@ pub fn run() -> Result<()> {
     // --- Build window + models ------------------------------------------
     // Set the Wayland app_id / X11 WM_CLASS *before* the window is created so
     // the Linux desktop shell can match the running window to the installed
-    // `meatshell.desktop` entry and show our icon in the dock/taskbar.  (On
+    // `rusterm.desktop` entry and show our icon in the dock/taskbar.  (On
     // Windows the icon comes from the embedded .ico, so this is a no-op there.)
-    let _ = slint::set_xdg_app_id("meatshell");
+    let _ = slint::set_xdg_app_id("rusterm");
     let window = AppWindow::new().context("failed to build Slint window")?;
 
     // Show the crate version (from Cargo.toml at compile time) in the sidebar,
@@ -526,7 +526,7 @@ pub fn run() -> Result<()> {
     // --- In-app update check (#48) -----------------------------------------
     // "Download" on the banner opens the latest-release page in the browser.
     window.on_open_update_url(move || {
-        let url = "https://github.com/jeff141/meatshell/releases/latest";
+        let url = "https://github.com/jeff141/rusterm/releases/latest";
         #[cfg(windows)]
         let _ = std::process::Command::new("explorer").arg(url).spawn();
         #[cfg(target_os = "macos")]
@@ -541,9 +541,9 @@ pub fn run() -> Result<()> {
         let weak = window.as_weak();
         std::thread::spawn(move || {
             let body = match ureq::get(
-                "https://api.github.com/repos/jeff141/meatshell/releases/latest",
+                "https://api.github.com/repos/jeff141/rusterm/releases/latest",
             )
-            .set("User-Agent", "meatshell-update-check")
+            .set("User-Agent", "rusterm-update-check")
             .timeout(std::time::Duration::from_secs(8))
             .call()
             {
@@ -710,6 +710,135 @@ pub fn run() -> Result<()> {
     window.on_confirm_close_yes(|| {
         let _ = slint::quit_event_loop();
     });
+
+
+    // ── WebDAV sync callbacks ──────────────────────────────────────────
+
+    // Load WebDAV settings into UI
+    {
+        match crate::webdav::load_settings() {
+            Ok(s) => {
+                window.set_webdav_url(s.base_url.into());
+                window.set_webdav_username(s.username.into());
+                window.set_webdav_password(s.password.into());
+                window.set_webdav_enabled(s.enabled);
+                window.set_webdav_auto_sync(s.auto_sync);
+            }
+            Err(e) => tracing::warn!("load webdav settings: {e}"),
+        }
+    }
+
+    // Open dialog
+    {
+        let weak = window.as_weak();
+        window.on_webdav_open_dialog(move || {
+            if let Some(w) = weak.upgrade() {
+                w.set_show_webdav_dialog(true);
+            }
+        });
+    }
+
+    // Save settings
+    {
+        let weak = window.as_weak();
+        window.on_webdav_save_settings(move |url, user, pass, enabled, auto| {
+            let settings = crate::webdav::WebDavSettings {
+                enabled,
+                base_url: url.to_string(),
+                username: user.to_string(),
+                password: pass.to_string(),
+                auto_sync: auto,
+            };
+            match crate::webdav::save_settings(&settings) {
+                Ok(()) => {
+                    if let Some(w) = weak.upgrade() {
+                        w.set_webdav_status("saved".into());
+                        w.set_show_webdav_dialog(false);
+                    }
+                }
+                Err(e) => {
+                    if let Some(w) = weak.upgrade() {
+                        w.set_webdav_status(format!("save error: {e}").into());
+                    }
+                }
+            }
+        });
+    }
+
+    // Test connection
+    {
+        let weak = window.as_weak();
+        window.on_webdav_test_connection(move || {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_webdav_busy(true);
+            w.set_webdav_status("testing...".into());
+            let settings = match crate::webdav::load_settings() {
+                Ok(s) => s,
+                Err(e) => { w.set_webdav_status(format!("{e}").into()); w.set_webdav_busy(false); return; }
+            };
+            let weak2 = weak.clone();
+            slint::spawn_local(async move {
+                let r = crate::webdav::test_connection(&settings).await;
+                if let Some(w) = weak2.upgrade() {
+                    match r {
+                        Ok(()) => w.set_webdav_status("connected ✓".into()),
+                        Err(e) => w.set_webdav_status(format!("fail: {e}").into()),
+                    }
+                    w.set_webdav_busy(false);
+                }
+            }).ok();
+        });
+    }
+
+    // Upload
+    {
+        let weak = window.as_weak();
+        window.on_webdav_upload(move || {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_webdav_busy(true);
+            w.set_webdav_status("uploading...".into());
+            let settings = match crate::webdav::load_settings() {
+                Ok(s) => s,
+                Err(e) => { w.set_webdav_status(format!("{e}").into()); w.set_webdav_busy(false); return; }
+            };
+            let weak2 = weak.clone();
+            slint::spawn_local(async move {
+                let r = crate::webdav::upload(&settings).await;
+                if let Some(w) = weak2.upgrade() {
+                    match r {
+                        Ok(h) => w.set_webdav_status(format!("upload ok (sha256: {}…)", &h[..16]).into()),
+                        Err(e) => w.set_webdav_status(format!("upload fail: {e}").into()),
+                    }
+                    w.set_webdav_busy(false);
+                }
+            }).ok();
+        });
+    }
+
+    // Download
+    {
+        let weak = window.as_weak();
+        window.on_webdav_download(move || {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_webdav_busy(true);
+            w.set_webdav_status("downloading...".into());
+            let settings = match crate::webdav::load_settings() {
+                Ok(s) => s,
+                Err(e) => { w.set_webdav_status(format!("{e}").into()); w.set_webdav_busy(false); return; }
+            };
+            let weak2 = weak.clone();
+            slint::spawn_local(async move {
+                let r = crate::webdav::download(&settings).await;
+                if let Some(w) = weak2.upgrade() {
+                    match r {
+                        Ok(h) => w.set_webdav_status(format!("download ok (sha256: {}…)", &h[..16]).into()),
+                        Err(e) => w.set_webdav_status(format!("download fail: {e}").into()),
+                    }
+                    w.set_webdav_busy(false);
+                }
+            }).ok();
+        });
+    }
 
     // Center the window on the primary monitor once it's shown (size is only
     // known after the first frame, so defer via a single-shot timer).
@@ -1058,7 +1187,7 @@ fn wire_session_callbacks(
         let store = store.clone();
         window.on_export_sessions(move || {
             if let Some(path) = rfd::FileDialog::new()
-                .set_file_name("meatshell-connections.json")
+                .set_file_name("rusterm-connections.json")
                 .add_filter("JSON", &["json"])
                 .save_file()
             {
@@ -2270,7 +2399,7 @@ fn apply_session_event_to_window(
                     win,
                     tab_id,
                     SessionEvent::Output(format!(
-                        "\r\n[meatshell] {} {}: {}\r\n",
+                        "\r\n[rusterm] {} {}: {}\r\n",
                         crate::i18n::t("无法打开", "Cannot open"),
                         name,
                         error
