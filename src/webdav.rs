@@ -91,8 +91,21 @@ fn build_client() -> Result<reqwest::Client> {
 
 pub async fn test_connection(settings: &WebDavSettings) -> Result<()> {
     let client = build_client()?;
-    let url = &settings.base_url;
-    tracing::info!("PROPFIND {} user={}", url, settings.username);
+    let url = settings.base_url.trim_end_matches('/');
+    tracing::info!("test_connection url={} user={}", url, settings.username);
+
+    // First try MKCOL to create the directory
+    tracing::info!("MKCOL {}", url);
+    let mkcol_resp = client
+        .request(reqwest::Method::from_bytes(b"MKCOL").unwrap(), url)
+        .basic_auth(&settings.username, Some(&settings.password))
+        .send()
+        .await
+        .context("failed to send MKCOL request")?;
+    let mkcol_status = mkcol_resp.status().as_u16();
+    tracing::info!("MKCOL response: {}", mkcol_status);
+
+    // Then PROPFIND to verify
     let propfind_body = r#"<?xml version="1.0" encoding="utf-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:prop><D:resourcetype/></D:prop>
