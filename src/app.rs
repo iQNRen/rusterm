@@ -3041,9 +3041,15 @@ fn wire_key_input(
     }
     // Copy a history command to the clipboard (#96).
     {
+        let weak = window.as_weak();
         window.on_copy_text(move |text: SharedString| {
             let t = text.to_string();
             std::thread::spawn(move || clipboard_set_text(t));
+            // 复制成功提示
+            if let Some(w) = weak.upgrade() {
+                w.set_toast_text("已复制到剪贴板 ✓".into());
+                w.set_toast_visible(true);
+            }
         });
     }
     // Delete a history entry (#96). The model is newest-first; map the row index
