@@ -1,6 +1,6 @@
 name: Publish to AUR
 
-# Pushes the meatshell-bin package to the AUR after a GitHub Release is
+# Pushes the rusterm-bin package to the AUR after a GitHub Release is
 # published. Requires three repository secrets (see packaging/aur/README.md):
 #   AUR_USERNAME, AUR_EMAIL, AUR_SSH_PRIVATE_KEY
 # Without them the job is skipped, so this is harmless until you set AUR up.
@@ -33,17 +33,17 @@ jobs:
                   | grep -oP '"tag_name":\s*"\K[^"]+')
           fi
           VER="${VER#v}"   # strip leading v
-          echo "Publishing meatshell-bin $VER"
+          echo "Publishing rusterm-bin $VER"
           sed -i "s/^pkgver=.*/pkgver=${VER}/" packaging/aur/PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" packaging/aur/PKGBUILD
           echo "VER=$VER" >> "$GITHUB_ENV"
 
-      - name: Publish meatshell-bin to the AUR
+      - name: Publish rusterm-bin to the AUR
         # Skips cleanly until the AUR SSH key secret is configured.
         if: ${{ secrets.AUR_SSH_PRIVATE_KEY != '' }}
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
         with:
-          pkgname: meatshell-bin
+          pkgname: rusterm-bin
           pkgbuild: packaging/aur/PKGBUILD
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
