@@ -2636,47 +2636,50 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 检查更新按钮
-                Rectangle { height: 1px; background: Theme.border-subtle; }
-                HorizontalLayout {
-                    spacing: 8px;
-                    alignment: center;
-                    Rectangle {
-                        width: 140px; height: 30px;
-                        border-radius: Theme.radius-sm;
-                        background: update-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
-                        border-width: 1px;
-                        border-color: Theme.border-subtle;
-                        update-ta := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => { root.check-for-updates(); }
-                        }
-                        HorizontalLayout {
-                            spacing: 4px;
-                            alignment: center;
-                            Text {
-                                text: "\u{E5D5}";  // system_update
-                                font-family: "Material Icons";
-                                color: Theme.text-secondary;
-                                font-size: 14px;
-                                vertical-alignment: center;
+                // 底部更新区域（固定在底部）
+                Rectangle { vertical-stretch: 0; height: 1px; background: Theme.border-subtle; }
+                VerticalLayout {
+                    spacing: 6px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: center;
+                        Rectangle {
+                            width: 140px; height: 30px;
+                            border-radius: Theme.radius-sm;
+                            background: update-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                            border-width: 1px;
+                            border-color: Theme.border-subtle;
+                            update-ta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.check-for-updates(); }
                             }
-                            Text {
-                                text: root.lang-en ? "Check Updates" : "检查更新";
-                                color: Theme.text-primary;
-                                font-size: Theme.fs-sm;
-                                vertical-alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: center;
+                                Text {
+                                    text: "\u{E5D5}";  // system_update
+                                    font-family: "Material Icons";
+                                    color: Theme.text-secondary;
+                                    font-size: 14px;
+                                    vertical-alignment: center;
+                                }
+                                Text {
+                                    text: root.lang-en ? "Check Updates" : "检查更新";
+                                    color: Theme.text-primary;
+                                    font-size: Theme.fs-sm;
+                                    vertical-alignment: center;
+                                }
                             }
                         }
                     }
-                }
-                // 更新状态
-                if root.update-status != "" : Text {
-                    text: root.update-status;
-                    color: Theme.accent;
-                    font-size: Theme.fs-sm;
-                    horizontal-alignment: center;
-                    wrap: word-wrap;
+                    // 更新状态
+                    if root.update-status != "" : Text {
+                        text: root.update-status;
+                        color: Theme.accent;
+                        font-size: Theme.fs-sm;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
                 }
             }
         }
