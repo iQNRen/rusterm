@@ -1022,13 +1022,13 @@ pub fn run() -> Result<()> {
             match crate::webdav::save_settings(&settings) {
                 Ok(()) => {
                     if let Some(w) = weak.upgrade() {
-                        w.set_webdav_status("saved".into());
+                        w.set_webdav_status(t("已保存", "saved").into());
                         w.set_show_webdav_dialog(false);
                     }
                 }
                 Err(e) => {
                     if let Some(w) = weak.upgrade() {
-                        w.set_webdav_status(format!("save error: {e}").into());
+                        w.set_webdav_status(format!("{}: {e}", t("保存失败", "save error")).into());
                     }
                 }
             }
@@ -1041,7 +1041,7 @@ pub fn run() -> Result<()> {
         window.on_webdav_test_connection(move || {
             let Some(w) = weak.upgrade() else { return };
             w.set_webdav_busy(true);
-            w.set_webdav_status("testing...".into());
+            w.set_webdav_status(t("测试中...", "testing...").into());
             let settings = crate::webdav::load_settings();
             let weak2 = weak.clone();
             std::thread::spawn(move || {
@@ -1050,8 +1050,8 @@ pub fn run() -> Result<()> {
                 slint::invoke_from_event_loop(move || {
                     if let Some(w) = weak2.upgrade() {
                         match r {
-                            Ok(()) => w.set_webdav_status("connected ✓".into()),
-                            Err(e) => w.set_webdav_status(format!("fail: {e}").into()),
+                            Ok(()) => w.set_webdav_status(t("连接成功 ✓", "connected ✓").into()),
+                            Err(e) => w.set_webdav_status(format!("{}: {e}", t("失败", "fail")).into()),
                         }
                         w.set_webdav_busy(false);
                     }
@@ -1066,7 +1066,7 @@ pub fn run() -> Result<()> {
         window.on_webdav_upload(move || {
             let Some(w) = weak.upgrade() else { return };
             w.set_webdav_busy(true);
-            w.set_webdav_status("uploading...".into());
+            w.set_webdav_status(t("上传中...", "uploading...").into());
             let settings = crate::webdav::load_settings();
             let weak2 = weak.clone();
             std::thread::spawn(move || {
@@ -1077,7 +1077,7 @@ pub fn run() -> Result<()> {
                         match r {
                             Ok(crate::webdav::SyncResult::Ok(h)) => {
                                 // 上传成功，更新 last_sync_hash
-                                w.set_webdav_status(format!("upload ok (sha256: {}…)", &h[..16]).into());
+                                w.set_webdav_status(format!("{} (sha256: {}…)", t("上传成功", "upload ok"), &h[..16]).into());
                                 update_sync_hash(&h);
                             }
                             Ok(crate::webdav::SyncResult::Conflict { local_hash, remote_hash }) => {
@@ -1087,7 +1087,7 @@ pub fn run() -> Result<()> {
                                 ).into());
                             }
                             Ok(crate::webdav::SyncResult::Merged(h)) => {
-                                w.set_webdav_status(format!("merged (sha256: {}…)", &h[..16]).into());
+                                w.set_webdav_status(format!("{} (sha256: {}…)", t("已合并", "merged"), &h[..16]).into());
                                 update_sync_hash(&h);
                             }
                             Ok(crate::webdav::SyncResult::UnsafeUpload(reason)) => {
@@ -1096,7 +1096,7 @@ pub fn run() -> Result<()> {
                                     "⚠ {}", reason
                                 ).into());
                             }
-                            Err(e) => w.set_webdav_status(format!("upload fail: {e}").into()),
+                            Err(e) => w.set_webdav_status(format!("{}: {e}", t("上传失败", "upload fail")).into()),
                         }
                         w.set_webdav_busy(false);
                     }
@@ -1111,7 +1111,7 @@ pub fn run() -> Result<()> {
         window.on_webdav_download(move || {
             let Some(w) = weak.upgrade() else { return };
             w.set_webdav_busy(true);
-            w.set_webdav_status("downloading...".into());
+            w.set_webdav_status(t("下载中...", "downloading...").into());
             let settings = crate::webdav::load_settings();
             let weak2 = weak.clone();
             // store_dl 和 sessions_model_dl 不能 Send，所以不传进线程
@@ -1152,18 +1152,18 @@ pub fn run() -> Result<()> {
                                     crate::i18n::set_language(new_store.language());
                                     crate::i18n::apply_to_slint();
                                     w.set_lang_en(crate::i18n::is_en());
-                                    w.set_webdav_status("下载成功，已自动应用 ✓".into());
+                                    w.set_webdav_status(t("下载成功，已自动应用 ✓", "downloaded, applied ✓").into());
                                 }
                                 Err(e) => {
-                                    w.set_webdav_status(format!("下载成功但重载失败: {e}").into());
+                                    w.set_webdav_status(format!("{}: {e}", t("下载成功但重载失败", "downloaded but reload failed")).into());
                                 }
                             }
                         } else if result_msg.starts_with("conflict:") {
                             // 冲突提示
-                            w.set_webdav_status("远端有新版本，请选择覆盖或合并".into());
+                            w.set_webdav_status(t("远端有新版本，请先下载或合并", "remote has newer version, download or merge first").into());
                         } else {
                             let err = result_msg.strip_prefix("fail:").unwrap_or(&result_msg);
-                            w.set_webdav_status(format!("下载失败: {err}").into());
+                            w.set_webdav_status(format!("{}: {err}", t("下载失败", "download failed")).into());
                         }
                         w.set_webdav_busy(false);
                     }
@@ -3344,11 +3344,11 @@ fn wire_key_input(
     {
         let weak = window.as_weak();
         window.on_copy_text(move |text: SharedString| {
-            let t = text.to_string();
-            std::thread::spawn(move || clipboard_set_text(t));
+            let txt = text.to_string();
+            std::thread::spawn(move || clipboard_set_text(txt));
             // 复制成功提示
             if let Some(w) = weak.upgrade() {
-                w.set_toast_text("已复制到剪贴板 ✓".into());
+                w.set_toast_text(crate::i18n::t("已复制到剪贴板 ✓", "copied to clipboard ✓").into());
                 w.set_toast_visible(true);
             }
         });
