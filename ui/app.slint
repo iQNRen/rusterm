@@ -370,10 +370,41 @@ export component AppWindow inherits Window {
     callback webdav-save-settings(string, string, string, bool, bool);
     callback webdav-open-dialog();
 
-    HorizontalLayout {
-        spacing: 0;
+    // 全局快捷键处理
+    FocusScope {
+        key-pressed(e) => {
+            if e.modifiers.control && e.text == "t" {
+                // Ctrl+T: 新标签页
+                root.new-tab-clicked();
+                accept
+            }
+            if e.modifiers.control && e.text == "w" {
+                // Ctrl+W: 关闭当前标签
+                root.tab-closed(root.active-tab-id);
+                accept
+            }
+            if e.modifiers.control && e.text == "b" {
+                // Ctrl+B: 切换侧边栏
+                root.sidebar-collapsed = !root.sidebar-collapsed;
+                accept
+            }
+            if e.modifiers.control && e.text == "n" {
+                // Ctrl+N: 新建会话
+                root.new-session-clicked();
+                accept
+            }
+            if e.modifiers.control && e.text == "," {
+                // Ctrl+,: 打开设置
+                root.settings-open = !root.settings-open;
+                accept
+            }
+            reject
+        }
 
-        // Left sidebar — collapsible (width animates to 0).
+        HorizontalLayout {
+            spacing: 0;
+
+            // Left sidebar — collapsible (width animates to 0).
         Sidebar {
             width: root.sidebar-collapsed ? 0px : 220px;
             clip: true;
@@ -563,7 +594,9 @@ export component AppWindow inherits Window {
                 }
             }
         }
-    }
+    }  // end HorizontalLayout
+
+    }  // end FocusScope (global shortcuts)
 
     // --- Top-right buttons: [☀/🌙 theme] [↓ download] [⚙ settings] ----------
     // Settings (gear) — far right.
