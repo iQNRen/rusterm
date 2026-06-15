@@ -555,10 +555,12 @@ pub fn run() -> Result<()> {
             let color_opt = parse_hex_color(&hex_str);
             // 只在颜色有效时更新预览和配置
             if let Some(c) = color_opt {
+                // 标准化 hex 格式
+                let normalized = normalize_hex(&hex_str).unwrap_or(hex_str);
                 let brush: slint::Brush = c.into();
                 {
                     let mut s = store.borrow_mut();
-                    s.set_term_bg_color(hex_str);
+                    s.set_term_bg_color(normalized);
                     let _ = s.save();
                 }
                 if let Some(w) = weak.upgrade() {
@@ -578,10 +580,12 @@ pub fn run() -> Result<()> {
             let color_opt = parse_hex_color(&hex_str);
             // 只在颜色有效时更新预览和配置
             if let Some(c) = color_opt {
+                // 标准化 hex 格式（如 "fff" → "#ffffff"）
+                let normalized = normalize_hex(&hex_str).unwrap_or(hex_str);
                 let brush: slint::Brush = c.into();
                 {
                     let mut s = store.borrow_mut();
-                    s.set_term_fg_color(hex_str);
+                    s.set_term_fg_color(normalized);
                     let _ = s.save();
                 }
                 // 同步到全局 THEME_OVERRIDE
@@ -4096,17 +4100,58 @@ fn update_sync_hash(hash: &str) {
     let _ = crate::webdav::save_settings(&settings);
 }
 
-/// 解析 hex 颜色字符串（如 "#1a1b26"）为 slint::Color
+/// 解析 hex 颜色字符串为 slint::Color
+///
+/// 支持的格式：
+/// - 6 位: "#1a1b26", "1a1b26", "1A1B26"
+/// - 3 位: "#fff", "fff", "F0F"（自动展开为 6 位）
+/// - 带空格: " #1a1b26 "
+/// - 8 位（带透明度）: "#1a1b26ff"（忽略透明度）
 fn parse_hex_color(hex: &str) -> Option<slint::Color> {
-    let hex = hex.trim_start_matches('#');
-    if hex.len() == 6 {
-        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
-        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
-        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
-        Some(slint::Color::from_rgb_u8(r, g, b))
-    } else {
-        None
-    }
+    let hex = hex.trim().trim_start_matches('#').trim();
+    let hex = hex.to_lowercase();
+
+    let expanded = match hex.len() {
+        3 => {
+            // 3 位展开为 6 位：abc → aabbcc
+            let chars: Vec<char> = hex.chars().collect();
+            format!("{}{}{}{}{}{}", chars[0], chars[0], chars[1], chars[1], chars[2], chars[2])
+        }
+        6 => hex,
+        8 => {
+            // 8 位（带透明度），取前 6 位
+            hex[..6].to_string()
+        }
+        _ => return None,
+    };
+
+    let r = u8::from_str_radix(&expanded[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&expanded[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&expanded[4..6], 16).ok()?;
+    Some(slint::Color::from_rgb_u8(r, g, b))
+}
+
+/// 标准化 hex 颜色字符串（用于显示和存储）
+///
+/// 输入: "fff" → 输出: "#ffffff"
+/// 输入: "1A1B26" → 输出: "#1a1b26"
+fn normalize_hex(hex: &str) -> Option<String> {
+    let hex = hex.trim().trim_start_matches('#').trim();
+    let hex = hex.to_lowercase();
+
+    let expanded = match hex.len() {
+        3 => {
+            let chars: Vec<char> = hex.chars().collect();
+            format!("{}{}{}{}{}{}", chars[0], chars[0], chars[1], chars[1], chars[2], chars[2])
+        }
+        6 => hex,
+        8 => hex[..6].to_string(),
+        _ => return None,
+    };
+
+    // 验证是合法 hex
+    u32::from_str_radix(&expanded, 16).ok()?;
+    Some(format!("#{}", expanded))
 }
 
 /// Write `text` to the system clipboard. Call from a dedicated thread, never the
