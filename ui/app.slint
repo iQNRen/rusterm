@@ -189,6 +189,8 @@ export component AppWindow inherits Window {
     callback delete-group(string /* name */);
     callback submit-group(string /* orig */, string /* name */);
     callback toggle-theme();               // flip dark ↔ light
+    callback check-for-updates();          // 检查是否有新版本
+    in property <string> update-status: ""; // 更新检查结果
     in-out property <length> sftp-panel-height: 220px; // shared; lets Rust locate the drop zone
     callback pick-download-dir();            // open a folder picker
     callback open-download-dir();            // reveal the folder in the OS
@@ -2589,6 +2591,49 @@ export component AppWindow inherits Window {
                             overflow: elide;
                         }
                     }
+                }
+
+                // 检查更新按钮
+                Rectangle { height: 1px; background: Theme.border-subtle; }
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: center;
+                    Rectangle {
+                        width: 140px; height: 30px;
+                        border-radius: Theme.radius-sm;
+                        background: update-ta.has-hover ? Theme.bg-hover : Theme.bg-elevated;
+                        border-width: 1px;
+                        border-color: Theme.border-subtle;
+                        update-ta := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.check-for-updates(); }
+                        }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            alignment: center;
+                            Text {
+                                text: "\u{E5D5}";  // system_update
+                                font-family: "Material Icons";
+                                color: Theme.text-secondary;
+                                font-size: 14px;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: root.lang-en ? "Check Updates" : "检查更新";
+                                color: Theme.text-primary;
+                                font-size: Theme.fs-sm;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+                // 更新状态
+                if root.update-status != "" : Text {
+                    text: root.update-status;
+                    color: Theme.accent;
+                    font-size: Theme.fs-sm;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
                 }
             }
         }
