@@ -264,20 +264,34 @@ pub fn run() -> Result<()> {
     // Populate the Interface font picker with installed monospace families.
     window.set_term_fonts(ModelRc::from(Rc::new(VecModel::from(system_monospace_fonts()))));
 
-    // 预设终端背景色（七彩斑斓 + 经典深色）
+    // 预设终端背景色（经典主题 + 七彩系列 + 亮色系列）
     let bg_presets: Vec<slint::Brush> = vec![
-        // 经典深色
+        // 经典深色主题
         slint::Color::from_rgb_u8(0x1a, 0x1b, 0x26).into(),  // Tokyo Night
         slint::Color::from_rgb_u8(0x28, 0x2a, 0x36).into(),  // Dracula
-        slint::Color::from_rgb_u8(0x1e, 0x1e, 0x2e).into(),  // Catppuccin
+        slint::Color::from_rgb_u8(0x1e, 0x1e, 0x2e).into(),  // Catppuccin Mocha
+        slint::Color::from_rgb_u8(0x24, 0x27, 0x3a).into(),  // Catppuccin Macchiato
+        slint::Color::from_rgb_u8(0x2b, 0x2d, 0x30).into(),  // Monokai
+        slint::Color::from_rgb_u8(0x28, 0x2c, 0x34).into(),  // One Dark
+        slint::Color::from_rgb_u8(0x2e, 0x34, 0x40).into(),  // Nord
+        slint::Color::from_rgb_u8(0x00, 0x2b, 0x36).into(),  // Solarized Dark
+        slint::Color::from_rgb_u8(0x3c, 0x38, 0x36).into(),  // Gruvbox Dark
+        slint::Color::from_rgb_u8(0x29, 0x2d, 0x3e).into(),  // Palenight
+        slint::Color::from_rgb_u8(0x1e, 0x20, 0x30).into(),  // Material Darker
+        slint::Color::from_rgb_u8(0x01, 0x16, 0x27).into(),  // Night Owl
+        slint::Color::from_rgb_u8(0x0b, 0x0e, 0x14).into(),  // Ayu Dark
+        slint::Color::from_rgb_u8(0x1c, 0x1e, 0x26).into(),  // Horizon
+        slint::Color::from_rgb_u8(0x2d, 0x35, 0x3b).into(),  // Everforest
+        slint::Color::from_rgb_u8(0x1f, 0x1f, 0x28).into(),  // Kanagawa
         // 七彩系列
         slint::Color::from_rgb_u8(0x0a, 0x19, 0x29).into(),  // 深海蓝
-        slint::Color::from_rgb_u8(0x00, 0x2b, 0x36).into(),  // 青色
         slint::Color::from_rgb_u8(0x1a, 0x3a, 0x2a).into(),  // 墨绿
         slint::Color::from_rgb_u8(0x2d, 0x1a, 0x1a).into(),  // 暗红
         slint::Color::from_rgb_u8(0x30, 0x0a, 0x24).into(),  // 紫罗兰
         slint::Color::from_rgb_u8(0x2a, 0x1a, 0x3a).into(),  // 深紫
         slint::Color::from_rgb_u8(0x3a, 0x2a, 0x0a).into(),  // 深金
+        slint::Color::from_rgb_u8(0x0a, 0x2a, 0x1a).into(),  // 暗翠
+        slint::Color::from_rgb_u8(0x2a, 0x0a, 0x0a).into(),  // 暗朱
         // 亮色系列
         slint::Color::from_rgb_u8(0xf0, 0xf0, 0xf0).into(),  // 亮白
         slint::Color::from_rgb_u8(0xff, 0xf8, 0xe1).into(),  // 暖黄
@@ -285,6 +299,10 @@ pub fn run() -> Result<()> {
         slint::Color::from_rgb_u8(0xe3, 0xf2, 0xfd).into(),  // 浅蓝
         slint::Color::from_rgb_u8(0xfc, 0xe4, 0xec).into(),  // 粉红
         slint::Color::from_rgb_u8(0xf3, 0xe5, 0xf5).into(),  // 浅紫
+        slint::Color::from_rgb_u8(0xfd, 0xf6, 0xe3).into(),  // Solarized Light
+        slint::Color::from_rgb_u8(0xfb, 0xfb, 0xf4).into(),  // GitHub Light
+        slint::Color::from_rgb_u8(0xf5, 0xf5, 0xf0).into(),  // One Light
+        slint::Color::from_rgb_u8(0xff, 0xf8, 0xf0).into(),  // 奶白
     ];
     window.set_bg_color_presets(ModelRc::from(Rc::new(VecModel::from(bg_presets))));
 
@@ -444,8 +462,15 @@ pub fn run() -> Result<()> {
     {
         // 预设颜色值（与上面 bg_presets 顺序一致）
         let preset_colors = vec![
-            "#1a1b26", "#282a36", "#002b36", "#2d2d2d",
-            "#1e1e2e", "#0d1117", "#300a24", "#0a1929",
+            "#1a1b26", "#282a36", "#1e1e2e", "#24273a",  // Tokyo Night, Dracula, Catppuccin Mocha, Macchiato
+            "#2b2d30", "#282c34", "#2e3440", "#002b36",  // Monokai, One Dark, Nord, Solarized Dark
+            "#3c3836", "#292d3e", "#1e2030", "#011627",  // Gruvbox, Palenight, Material Darker, Night Owl
+            "#0b0e14", "#1c1e26", "#2d353b", "#1f1f28",  // Ayu Dark, Horizon, Everforest, Kanagawa
+            "#0a1929", "#1a3a2a", "#2d1a1a", "#300a24",  // 深海蓝, 墨绿, 暗红, 紫罗兰
+            "#2a1a3a", "#3a2a0a", "#0a2a1a", "#2a0a0a",  // 深紫, 深金, 暗翠, 暗朱
+            "#f0f0f0", "#fff8e1", "#e8f5e9", "#e3f2fd",  // 亮白, 暖黄, 浅绿, 浅蓝
+            "#fce4ec", "#f3e5f5", "#fdf6e3", "#fbfbf4",  // 粉红, 浅紫, Solarized Light, GitHub Light
+            "#f5f5f0", "#fff8f0",                          // One Light, 奶白
         ];
         let weak = window.as_weak();
         let store = store.clone();
