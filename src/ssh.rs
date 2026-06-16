@@ -1030,8 +1030,9 @@ impl Handler for ClientHandler {
                     // 匹配 host 或 host:port / Match host or host:port
                     if kh_host == host_simple || kh_host == host_key {
                         // 提取已知的公钥数据 / Extract the known public key data
+                        // 格式: host algorithm base64key
                         if parts.len() >= 3 {
-                            let kh_key_data = parts[2];
+                            let kh_key_data = format!("{} {}", parts[1], parts[2]);
                             // 将当前服务器公钥序列化为相同格式 / Serialize current key in same format
                             let current_key_data = format!(
                                 "{} {}",
