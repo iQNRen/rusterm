@@ -214,6 +214,7 @@ export component AppWindow inherits Window {
     in-out property <string> hotkey-new-session: "n";   // Ctrl+N: 新建会话
     in-out property <string> hotkey-settings: ",";      // Ctrl+,: 打开设置
     callback set-hotkey(string, string);     // (action, key) — 保存快捷键配置
+    in-out property <string> recording-hotkey: "";  // 正在录制的快捷键 action，空=未录制
 
     // --- Update check (#48) ------------------------------------------------
     // Set by Rust after a background GitHub-releases query; purely informational
@@ -2663,74 +2664,99 @@ export component AppWindow inherits Window {
                             spacing: 16px;
                             alignment: start;
 
-                            Text {
-                                text: root.lang-en ? "Keyboard Shortcuts" : "键盘快捷键";
-                                color: Theme.text-primary;
-                                font-size: Theme.fs-lg;
-                                font-weight: 600;
-                            }
-                            Text {
-                                text: root.lang-en
-                                    ? "All shortcuts use Ctrl + key. Click the key to change it, then press a new key."
-                                    : "所有快捷键均为 Ctrl + 按键。点击按键可修改，然后按下新按键即可。";
-                                color: Theme.text-muted;
-                                font-size: Theme.fs-sm;
-                                wrap: word-wrap;
-                            }
+                            // 按键录制用 FocusScope
+                            FocusScope {
+                                key-pressed(e) => {
+                                    if e.text == "\u{1b}" {
+                                        // Esc 取消录制
+                                        root.recording-hotkey = "";
+                                        accept
+                                    }
+                                    if root.recording-hotkey != "" {
+                                        // 录制模式：捕获按键，保存快捷键
+                                        root.set-hotkey(root.recording-hotkey, e.text);
+                                        root.recording-hotkey = "";
+                                        accept
+                                    }
+                                    reject
+                                }
 
-                            // 快捷键列表
-                            for hk-item[i] in [
-                                { label-zh: "新建标签页", label-en: "New Tab", icon: "\u{E145}", action: "new-tab" },
-                                { label-zh: "关闭标签页", label-en: "Close Tab", icon: "\u{E14C}", action: "close-tab" },
-                                { label-zh: "切换侧边栏", label-en: "Toggle Sidebar", icon: "\u{E5CB}", action: "toggle-sidebar" },
-                                { label-zh: "新建会话", label-en: "New Session", icon: "\u{E157}", action: "new-session" },
-                                { label-zh: "打开设置", label-en: "Open Settings", icon: "\u{E8B8}", action: "settings" }
-                            ] : Rectangle {
-                                height: 36px;
-                                border-radius: Theme.radius-sm;
-                                border-width: 1px;
-                                border-color: Theme.border-subtle;
-                                background: Theme.bg-elevated;
-                                HorizontalLayout {
-                                    padding-left: 12px;
-                                    padding-right: 12px;
-                                    spacing: 8px;
-                                    Text {
-                                        text: hk-item.icon;
-                                        font-family: "Material Icons";
-                                        color: Theme.text-secondary;
-                                        font-size: 16px;
-                                        vertical-alignment: center;
-                                    }
-                                    Text {
-                                        text: root.lang-en ? hk-item.label-en : hk-item.label-zh;
-                                        color: Theme.text-primary;
-                                        font-size: Theme.fs-sm;
-                                        vertical-alignment: center;
-                                        horizontal-stretch: 1;
-                                    }
-                                    Rectangle {
-                                        width: 60px; height: 24px;
-                                        border-radius: Theme.radius-sm;
-                                        border-width: 1px;
-                                        border-color: Theme.border-subtle;
-                                        background: hk-key-ta.has-hover ? Theme.bg-hover : Theme.bg-root;
-                                        hk-key-ta := TouchArea {
-                                            mouse-cursor: pointer;
+                                Text {
+                                    text: root.lang-en ? "Keyboard Shortcuts" : "键盘快捷键";
+                                    color: Theme.text-primary;
+                                    font-size: Theme.fs-lg;
+                                    font-weight: 600;
+                                }
+                                Text {
+                                    text: root.recording-hotkey != ""
+                                        ? (root.lang-en ? "Press a key to set shortcut (Esc to cancel)..." : "按下按键设置快捷键（Esc 取消）...")
+                                        : (root.lang-en
+                                            ? "All shortcuts use Ctrl + key. Click the key to change it."
+                                            : "所有快捷键均为 Ctrl + 按键。点击按键可修改。");
+                                    color: root.recording-hotkey != "" ? Theme.accent : Theme.text-muted;
+                                    font-size: Theme.fs-sm;
+                                    wrap: word-wrap;
+                                }
+
+                                // 快捷键列表
+                                for hk-item[i] in [
+                                    { label-zh: "新建标签页", label-en: "New Tab", icon: "\u{E145}", action: "new-tab" },
+                                    { label-zh: "关闭标签页", label-en: "Close Tab", icon: "\u{E14C}", action: "close-tab" },
+                                    { label-zh: "切换侧边栏", label-en: "Toggle Sidebar", icon: "\u{E5CB}", action: "toggle-sidebar" },
+                                    { label-zh: "新建会话", label-en: "New Session", icon: "\u{E157}", action: "new-session" },
+                                    { label-zh: "打开设置", label-en: "Open Settings", icon: "\u{E8B8}", action: "settings" }
+                                ] : Rectangle {
+                                    height: 36px;
+                                    border-radius: Theme.radius-sm;
+                                    border-width: 1px;
+                                    border-color: root.recording-hotkey == hk-item.action ? Theme.accent : Theme.border-subtle;
+                                    background: Theme.bg-elevated;
+                                    HorizontalLayout {
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 8px;
+                                        Text {
+                                            text: hk-item.icon;
+                                            font-family: "Material Icons";
+                                            color: Theme.text-secondary;
+                                            font-size: 16px;
+                                            vertical-alignment: center;
                                         }
                                         Text {
-                                            text: "Ctrl+" + (
-                                                hk-item.action == "new-tab" ? root.hotkey-new-tab :
-                                                hk-item.action == "close-tab" ? root.hotkey-close-tab :
-                                                hk-item.action == "toggle-sidebar" ? root.hotkey-toggle-sidebar :
-                                                hk-item.action == "new-session" ? root.hotkey-new-session :
-                                                root.hotkey-settings
-                                            );
-                                            color: Theme.accent;
+                                            text: root.lang-en ? hk-item.label-en : hk-item.label-zh;
+                                            color: Theme.text-primary;
                                             font-size: Theme.fs-sm;
-                                            font-family: "monospace";
-                                            horizontal-alignment: center;
                                             vertical-alignment: center;
+                                            horizontal-stretch: 1;
+                                        }
+                                        Rectangle {
+                                            width: 80px; height: 24px;
+                                            border-radius: Theme.radius-sm;
+                                            border-width: 1px;
+                                            border-color: root.recording-hotkey == hk-item.action ? Theme.accent : Theme.border-subtle;
+                                            background: hk-key-ta.has-hover ? Theme.bg-hover : (root.recording-hotkey == hk-item.action ? Theme.accent.with-alpha(0.15) : Theme.bg-root);
+                                            hk-key-ta := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => {
+                                                    root.recording-hotkey = hk-item.action;
+                                                }
+                                            }
+                                            Text {
+                                                text: root.recording-hotkey == hk-item.action
+                                                    ? (root.lang-en ? "Listening..." : "请按键...")
+                                                    : "Ctrl+" + (
+                                                        hk-item.action == "new-tab" ? root.hotkey-new-tab :
+                                                        hk-item.action == "close-tab" ? root.hotkey-close-tab :
+                                                        hk-item.action == "toggle-sidebar" ? root.hotkey-toggle-sidebar :
+                                                        hk-item.action == "new-session" ? root.hotkey-new-session :
+                                                        root.hotkey-settings
+                                                    );
+                                                color: root.recording-hotkey == hk-item.action ? Theme.accent : Theme.text-primary;
+                                                font-size: Theme.fs-sm;
+                                                font-family: "monospace";
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
                                         }
                                     }
                                 }
