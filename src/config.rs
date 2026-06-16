@@ -252,6 +252,44 @@ pub struct QuickCommand {
     pub command: String,
 }
 
+/// 快捷键配置结构体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HotkeyConfig {
+    /// 新建标签页（默认 "t"）
+    #[serde(default = "default_hk_new_tab")]
+    pub new_tab: String,
+    /// 关闭标签页（默认 "w"）
+    #[serde(default = "default_hk_close_tab")]
+    pub close_tab: String,
+    /// 切换侧边栏（默认 "b"）
+    #[serde(default = "default_hk_toggle_sidebar")]
+    pub toggle_sidebar: String,
+    /// 新建会话（默认 "n"）
+    #[serde(default = "default_hk_new_session")]
+    pub new_session: String,
+    /// 打开设置（默认 ","）
+    #[serde(default = "default_hk_settings")]
+    pub settings: String,
+}
+
+impl Default for HotkeyConfig {
+    fn default() -> Self {
+        Self {
+            new_tab: default_hk_new_tab(),
+            close_tab: default_hk_close_tab(),
+            toggle_sidebar: default_hk_toggle_sidebar(),
+            new_session: default_hk_new_session(),
+            settings: default_hk_settings(),
+        }
+    }
+}
+
+fn default_hk_new_tab() -> String { "t".into() }
+fn default_hk_close_tab() -> String { "w".into() }
+fn default_hk_toggle_sidebar() -> String { "b".into() }
+fn default_hk_new_session() -> String { "n".into() }
+fn default_hk_settings() -> String { ",".into() }
+
 /// On-disk layout. Keep additive to ease forward-compat.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConfigFile {
@@ -310,6 +348,9 @@ pub struct ConfigFile {
     /// 自定义终端字体颜色（hex，如 "#d4d4d4"）。空字符串表示使用默认主题色。
     #[serde(default)]
     pub term_fg_color: String,
+    /// 快捷键配置：action -> key 映射（不含 Ctrl 前缀）
+    #[serde(default)]
+    pub hotkeys: HotkeyConfig,
 }
 
 fn default_bg_opacity() -> f32 {
@@ -590,6 +631,23 @@ impl ConfigStore {
     }
     pub fn set_term_fg_color(&mut self, color: String) {
         self.cache.term_fg_color = color;
+    }
+
+    /// 获取快捷键配置的引用
+    pub fn hotkeys(&self) -> &HotkeyConfig {
+        &self.cache.hotkeys
+    }
+
+    /// 设置单个快捷键（action: new_tab/close_tab/toggle_sidebar/new_session/settings）
+    pub fn set_hotkey(&mut self, action: &str, key: String) {
+        match action {
+            "new_tab" => self.cache.hotkeys.new_tab = key,
+            "close_tab" => self.cache.hotkeys.close_tab = key,
+            "toggle_sidebar" => self.cache.hotkeys.toggle_sidebar = key,
+            "new_session" => self.cache.hotkeys.new_session = key,
+            "settings" => self.cache.hotkeys.settings = key,
+            _ => tracing::warn!("unknown hotkey action: {}", action),
+        }
     }
 
     /// Whether the SFTP panel follows the terminal's cd (default true).

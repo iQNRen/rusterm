@@ -207,6 +207,14 @@ export component AppWindow inherits Window {
     callback clear-transfers();              // wipe the transfer history
     callback set-language(string);           // switch UI language ("zh" / "en")
 
+    // --- Hotkey settings (快捷键) -------------------------------------------
+    in-out property <string> hotkey-new-tab: "t";       // Ctrl+T: 新标签页
+    in-out property <string> hotkey-close-tab: "w";     // Ctrl+W: 关闭标签
+    in-out property <string> hotkey-toggle-sidebar: "b"; // Ctrl+B: 切换侧边栏
+    in-out property <string> hotkey-new-session: "n";   // Ctrl+N: 新建会话
+    in-out property <string> hotkey-settings: ",";      // Ctrl+,: 打开设置
+    callback set-hotkey(string, string);     // (action, key) — 保存快捷键配置
+
     // --- Update check (#48) ------------------------------------------------
     // Set by Rust after a background GitHub-releases query; purely informational
     // (the app keeps working on the current version).
@@ -380,31 +388,26 @@ export component AppWindow inherits Window {
     callback webdav-save-settings(string, string, string, bool, bool);
     callback webdav-open-dialog();
 
-    // 全局快捷键处理
+    // 全局快捷键处理（从配置读取）
     FocusScope {
         key-pressed(e) => {
-            if e.modifiers.control && e.text == "t" {
-                // Ctrl+T: 新标签页
+            if e.modifiers.control && e.text == root.hotkey-new-tab {
                 root.new-tab-clicked();
                 accept
             }
-            if e.modifiers.control && e.text == "w" {
-                // Ctrl+W: 关闭当前标签
+            if e.modifiers.control && e.text == root.hotkey-close-tab {
                 root.tab-closed(root.active-tab-id);
                 accept
             }
-            if e.modifiers.control && e.text == "b" {
-                // Ctrl+B: 切换侧边栏
+            if e.modifiers.control && e.text == root.hotkey-toggle-sidebar {
                 root.sidebar-collapsed = !root.sidebar-collapsed;
                 accept
             }
-            if e.modifiers.control && e.text == "n" {
-                // Ctrl+N: 新建会话
+            if e.modifiers.control && e.text == root.hotkey-new-session {
                 root.new-session-clicked();
                 accept
             }
-            if e.modifiers.control && e.text == "," {
-                // Ctrl+,: 打开设置
+            if e.modifiers.control && e.text == root.hotkey-settings {
                 root.settings-open = !root.settings-open;
                 accept
             }
@@ -2013,6 +2016,26 @@ export component AppWindow inherits Window {
                                            vertical-alignment: center; horizontal-stretch: 1; }
                                 }
                             }
+                            // 快捷键设置页
+                            Rectangle {
+                                height: 30px;
+                                border-radius: Theme.radius-sm;
+                                background: root.ifd-page == "hotkey"
+                                    ? Theme.bg-active
+                                    : (nav-hotkey-ta.has-hover ? Theme.bg-hover : transparent);
+                                nav-hotkey-ta := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { root.ifd-page = "hotkey"; }
+                                }
+                                HorizontalLayout {
+                                    padding-left: 10px; spacing: 8px;
+                                    Text { text: "\u{E312}"; font-family: "Material Icons"; // keyboard
+                                           color: Theme.text-primary; font-size: Theme.fs-sm; vertical-alignment: center; }
+                                    Text { text: root.lang-en ? "Hotkeys" : "快捷键";
+                                           color: Theme.text-primary; font-size: Theme.fs-md;
+                                           vertical-alignment: center; horizontal-stretch: 1; }
+                                }
+                            }
                         }
                     }
                     Rectangle {
@@ -2633,6 +2656,87 @@ export component AppWindow inherits Window {
                                 }
                             }
                         }
+
+                        // ===== 快捷键设置页 =====
+                        if root.ifd-page == "hotkey" : VerticalLayout {
+                            padding: 18px;
+                            spacing: 16px;
+                            alignment: start;
+
+                            Text {
+                                text: root.lang-en ? "Keyboard Shortcuts" : "键盘快捷键";
+                                color: Theme.text-primary;
+                                font-size: Theme.fs-lg;
+                                font-weight: 600;
+                            }
+                            Text {
+                                text: root.lang-en
+                                    ? "All shortcuts use Ctrl + key. Click the key to change it, then press a new key."
+                                    : "所有快捷键均为 Ctrl + 按键。点击按键可修改，然后按下新按键即可。";
+                                color: Theme.text-muted;
+                                font-size: Theme.fs-sm;
+                                wrap: word-wrap;
+                            }
+
+                            // 快捷键列表
+                            for hk-item[i] in [
+                                { label-zh: "新建标签页", label-en: "New Tab", icon: "\u{E145}", action: "new-tab" },
+                                { label-zh: "关闭标签页", label-en: "Close Tab", icon: "\u{E14C}", action: "close-tab" },
+                                { label-zh: "切换侧边栏", label-en: "Toggle Sidebar", icon: "\u{E5CB}", action: "toggle-sidebar" },
+                                { label-zh: "新建会话", label-en: "New Session", icon: "\u{E157}", action: "new-session" },
+                                { label-zh: "打开设置", label-en: "Open Settings", icon: "\u{E8B8}", action: "settings" }
+                            ] : Rectangle {
+                                height: 36px;
+                                border-radius: Theme.radius-sm;
+                                border-width: 1px;
+                                border-color: Theme.border-subtle;
+                                background: Theme.bg-elevated;
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    spacing: 8px;
+                                    Text {
+                                        text: hk-item.icon;
+                                        font-family: "Material Icons";
+                                        color: Theme.text-secondary;
+                                        font-size: 16px;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.lang-en ? hk-item.label-en : hk-item.label-zh;
+                                        color: Theme.text-primary;
+                                        font-size: Theme.fs-sm;
+                                        vertical-alignment: center;
+                                        horizontal-stretch: 1;
+                                    }
+                                    Rectangle {
+                                        width: 60px; height: 24px;
+                                        border-radius: Theme.radius-sm;
+                                        border-width: 1px;
+                                        border-color: Theme.border-subtle;
+                                        background: hk-key-ta.has-hover ? Theme.bg-hover : Theme.bg-root;
+                                        hk-key-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                        }
+                                        Text {
+                                            text: "Ctrl+" + (
+                                                hk-item.action == "new-tab" ? root.hotkey-new-tab :
+                                                hk-item.action == "close-tab" ? root.hotkey-close-tab :
+                                                hk-item.action == "toggle-sidebar" ? root.hotkey-toggle-sidebar :
+                                                hk-item.action == "new-session" ? root.hotkey-new-session :
+                                                root.hotkey-settings
+                                            );
+                                            color: Theme.accent;
+                                            font-size: Theme.fs-sm;
+                                            font-family: "monospace";
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                     }  // content-area VerticalLayout
                 }  // Flickable
                     }  // Rectangle (content)

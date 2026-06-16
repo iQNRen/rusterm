@@ -242,6 +242,17 @@ pub fn run() -> Result<()> {
         }
         window.set_term_font_size(s.font_size() as f32);
     }
+
+    // 加载快捷键配置到 UI
+    {
+        let s = store.borrow();
+        let hk = s.hotkeys();
+        window.set_hotkey_new_tab(hk.new_tab.clone().into());
+        window.set_hotkey_close_tab(hk.close_tab.clone().into());
+        window.set_hotkey_toggle_sidebar(hk.toggle_sidebar.clone().into());
+        window.set_hotkey_new_session(hk.new_session.clone().into());
+        window.set_hotkey_settings(hk.settings.clone().into());
+    }
     // Editable inputs (e.g. the SFTP path bar) need a CJK-capable font: the
     // embedded Cascadia Mono has no Chinese glyphs and native TextInput doesn't
     // glyph-fallback like Text does, so typed Chinese would render as tofu (#54).
@@ -694,6 +705,32 @@ pub fn run() -> Result<()> {
             if let Some(w) = weak.upgrade() {
                 w.set_lang_en(crate::i18n::is_en());
                 w.invoke_refresh_sidebar();
+            }
+        });
+    }
+
+    // 快捷键设置回调：保存到配置并更新 UI 属性
+    {
+        let weak = window.as_weak();
+        let store = store.clone();
+        window.on_set_hotkey(move |action: SharedString, key: SharedString| {
+            let action_str = action.to_string();
+            let key_str = key.to_string();
+            {
+                let mut s = store.borrow_mut();
+                s.set_hotkey(&action_str, key_str.clone());
+                let _ = s.save();
+            }
+            // 更新 Slint 侧属性，立即生效
+            if let Some(w) = weak.upgrade() {
+                match action_str.as_str() {
+                    "new_tab" => w.set_hotkey_new_tab(key.into()),
+                    "close_tab" => w.set_hotkey_close_tab(key.into()),
+                    "toggle_sidebar" => w.set_hotkey_toggle_sidebar(key.into()),
+                    "new_session" => w.set_hotkey_new_session(key.into()),
+                    "settings" => w.set_hotkey_settings(key.into()),
+                    _ => {}
+                }
             }
         });
     }
