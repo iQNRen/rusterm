@@ -216,19 +216,26 @@ async fn run_sftp(
             let stream = crate::proxy::connect(&p, &session.host, session.port)
                 .await
                 .with_context(|| format!("sftp proxy connect {} failed", addr))?;
-            client::connect_stream(config, stream, SftpClientHandler)
+            client::connect_stream(config, stream, sftp_handler(&session, &events))
                 .await
                 .with_context(|| format!("sftp connect {} failed", addr))?
         }
-        None => client::connect(config, addr.as_str(), SftpClientHandler)
+        None => client::connect(config, addr.as_str(), sftp_handler(&session, &events))
             .await
             .with_context(|| format!("sftp connect {} failed", addr))?,
+    };
+
+    // Resolve missing username/password (shares the shell's prompt; the UI
+    // de-dupes by session id so SFTP doesn't prompt a second time) (#110).
+    let (user, password) = match crate::ssh::resolve_credentials(&session, &events).await {
+        Some(c) => c,
+        None => return Err(anyhow!(t("已取消登录", "login cancelled"))),
     };
 
     // --- Authenticate (same method as the shell session) -------------------
     let authed = match session.auth {
         AuthMethod::Password => handle
-            .authenticate_password(&session.user, session.password.as_str())
+            .authenticate_password(&user, password.as_str())
             .await
             .context("sftp password auth failed")?,
         AuthMethod::Key => {
@@ -243,15 +250,12 @@ async fn run_sftp(
                 .unwrap_or(normalised);
             let keypair = load_secret_key(Path::new(&key_path), None)
                 .with_context(|| format!("failed to load key {key_path}"))?;
-            let hash = if keypair.algorithm().is_rsa() {
-                Some(HashAlg::Sha256)
-            } else {
-                None
-            };
+            // RSA keys need an explicit SHA-2 hash; other key types don't.
+            let hash = keypair.algorithm().is_rsa().then_some(HashAlg::Sha256);
             let key_with_hash = PrivateKeyWithHashAlg::new(Arc::new(keypair), hash)
                 .context("invalid private key")?;
             handle
-                .authenticate_publickey(&session.user, key_with_hash)
+                .authenticate_publickey(&user, key_with_hash)
                 .await
                 .context("sftp publickey auth failed")?
         }
@@ -289,7 +293,7 @@ async fn run_sftp(
             let _ = events.send(SessionEvent::SftpStatus(home.clone()));
         }
         Err(e) => {
-            let _ = events.send(SessionEvent::SftpStatus(format!("{}: {e}", t("SFTP 错误", "SFTP error"))));
+            let _ = events.send(SessionEvent::SftpError(list_error_msg(&home, &e)));
         }
     }
 
@@ -349,7 +353,7 @@ async fn run_sftp(
                         let _ = events.send(SessionEvent::SftpStatus(path));
                     }
                     Err(e) => {
-                        let _ = events.send(SessionEvent::SftpStatus(format!("{}: {e}", t("列目录失败", "list directory failed"))));
+                        let _ = events.send(SessionEvent::SftpError(list_error_msg(&path, &e)));
                     }
                 }
             }
@@ -901,6 +905,18 @@ fn spawn_edit_watcher(
 // SFTP helpers
 // ---------------------------------------------------------------------------
 
+/// A friendlier message for a failed directory listing, calling out the common
+/// permission-denied case explicitly rather than dumping the raw error (#112).
+fn list_error_msg(path: &str, e: &impl std::fmt::Display) -> String {
+    let raw = e.to_string();
+    let low = raw.to_lowercase();
+    if low.contains("permission") || low.contains("denied") {
+        format!("{}: {}", t("权限不足,无法访问", "Permission denied"), path)
+    } else {
+        format!("{} {}: {}", t("无法访问", "Cannot open"), path, raw)
+    }
+}
+
 async fn list_dir_impl(sftp: &SftpSession, path: &str) -> Result<Vec<RemoteEntry>> {
     let raw = sftp
         .read_dir(path)
@@ -1241,10 +1257,24 @@ async fn upload_pipelined(
 }
 
 // ---------------------------------------------------------------------------
-// russh client handler (accept any server key, same as the shell handler)
+// russh client handler — verifies the host key against known_hosts, reusing the
+// shell session's prompt path (#109-5). The UI de-duplicates by host:port, so a
+// fresh host confirmed for the shell won't prompt again for SFTP.
 // ---------------------------------------------------------------------------
 
-struct SftpClientHandler;
+struct SftpClientHandler {
+    host: String,
+    port: u16,
+    events: UnboundedSender<SessionEvent>,
+}
+
+fn sftp_handler(session: &Session, events: &UnboundedSender<SessionEvent>) -> SftpClientHandler {
+    SftpClientHandler {
+        host: session.host.clone(),
+        port: session.port,
+        events: events.clone(),
+    }
+}
 
 #[async_trait]
 impl Handler for SftpClientHandler {
@@ -1252,9 +1282,9 @@ impl Handler for SftpClientHandler {
 
     async fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> Result<bool, Self::Error> {
-        Ok(true)
+        Ok(crate::ssh::verify_host_key(&self.host, self.port, server_public_key, &self.events).await)
     }
 
     async fn data(

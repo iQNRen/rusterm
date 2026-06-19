@@ -304,7 +304,7 @@ pub struct ConfigFile {
     /// Theme preference: "system" (default) | "dark" | "light".
     #[serde(default)]
     pub theme_pref: String,
-    /// Terminal font family. Empty = the built-in default (Cascadia Mono).
+    /// Terminal font family. Empty = the built-in default ("Meatshell Mono").
     #[serde(default)]
     pub font_family: String,
     /// Terminal font size in px. 0 = the built-in default.
@@ -351,6 +351,10 @@ pub struct ConfigFile {
     /// 快捷键配置：action -> key 映射（不含 Ctrl 前缀）
     #[serde(default)]
     pub hotkeys: HotkeyConfig,
+    /// When session-sync is on, also mirror SFTP uploads to the other online
+    /// sessions (same path, falling back to each panel's current dir).
+    #[serde(default)]
+    pub sync_upload: bool,
 }
 
 fn default_bg_opacity() -> f32 {
@@ -377,6 +381,20 @@ pub struct ConfigStore {
     /// ChaCha20-Poly1305 key loaded from (or freshly generated into)
     /// `secret.key` in the same directory as `sessions.json`.
     key: [u8; 32],
+}
+
+/// Remove duplicate entries in place, keeping the *last* (most recent)
+/// occurrence of each and preserving relative order (#113). The list is capped
+/// at 200, so the quadratic scan is trivial.
+fn dedup_keep_last(items: &mut Vec<String>) {
+    let mut i = 0;
+    while i < items.len() {
+        if items[i + 1..].contains(&items[i]) {
+            items.remove(i);
+        } else {
+            i += 1;
+        }
+    }
 }
 
 impl ConfigStore {
@@ -490,6 +508,9 @@ impl ConfigStore {
                             session.password = Secret::new(plain);
                         }
                     }
+                    // Clean up any duplicate history accumulated before #113,
+                    // keeping the last (most recent) occurrence of each command.
+                    dedup_keep_last(&mut cfg.command_history);
                     cfg
                 }
                 Err(err) => {
@@ -673,15 +694,16 @@ impl ConfigStore {
         &self.cache.command_history
     }
 
-    /// Append a command to the history: skips blanks and consecutive repeats,
-    /// and caps the list so it can't grow without bound.
+    /// Append a command to the history: skips blanks, de-duplicates globally so
+    /// each command appears once, and re-appends at the end so the most-recently
+    /// used command is always last. Capped so it can't grow without bound (#113).
     pub fn push_command_history(&mut self, cmd: String) {
         if cmd.trim().is_empty() {
             return;
         }
-        if self.cache.command_history.last().map(String::as_str) == Some(cmd.as_str()) {
-            return;
-        }
+        // Drop any earlier occurrence, then push → no duplicates and "last used"
+        // moves to the end (bash `HISTCONTROL=erasedups` semantics).
+        self.cache.command_history.retain(|c| c != &cmd);
         const CAP: usize = 200;
         self.cache.command_history.push(cmd);
         let len = self.cache.command_history.len();
@@ -713,6 +735,16 @@ impl ConfigStore {
 
     pub fn set_collapse_sftp_default(&mut self, v: bool) {
         self.cache.collapse_sftp_default = v;
+    }
+
+    /// Mirror SFTP uploads to other sessions while session-sync is on (default
+    /// false). Only has effect when the session-sync toggle is on.
+    pub fn sync_upload(&self) -> bool {
+        self.cache.sync_upload
+    }
+
+    pub fn set_sync_upload(&mut self, v: bool) {
+        self.cache.sync_upload = v;
     }
 
     /// Whether each download prompts for a save location (default false) (#87).

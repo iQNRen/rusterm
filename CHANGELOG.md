@@ -5,6 +5,158 @@ All notable changes are documented here. 本文件记录所有重要变更。
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-06-18
+
+### Added / 新增
+
+- **Immersive frameless title bar.** On Windows/Linux the app draws its own
+  themed title bar (app icon + name, minimize/maximize/close, draggable to move,
+  double-click to maximize, edge/corner resize) instead of the OS chrome — so the
+  top follows the light/dark theme instead of staying a mismatched native bar.
+  macOS keeps its native decorations. (#119)
+  **沉浸式无边框标题栏。** Windows/Linux 下自绘主题色标题栏(应用图标+名称、
+  最小化/最大化/关闭、拖动移动、双击最大化、边角缩放),不再使用系统标题栏,顶部
+  跟随明暗主题;macOS 保留原生标题栏。
+
+### Fixed / 修复
+
+- **htop/btop box-drawing and braille no longer render as tofu** on machines
+  without Cascadia Mono installed (e.g. Win11 Home). The embedded font is now a
+  uniquely-named family ("Meatshell Mono") so the OS can't substitute a
+  glyph-poor fallback for it. (#114)
+  **htop/btop 的线框和盲文字符不再显示为方块**(在未安装 Cascadia Mono 的机器上,
+  如 Win11 家庭版)。内嵌字体改用独一无二的族名「Meatshell Mono」,系统无法再用
+  缺字形的字体顶替它。
+- **The injected setup line no longer leaks to the terminal on connect**, even
+  when it wraps across the terminal width. Output is buffered until the hook's
+  OSC sequence arrives, then everything up to it is discarded. (#98)
+  **连接后不再出现注入的设置命令**,即使它按终端宽度换行也能正确隐藏。
+- **Smooth scrollback across the live/scrolled boundary.** After shrinking then
+  restoring the terminal (e.g. dragging the SFTP panel over it and back),
+  scrolling back through history no longer jumps near the bottom. (#119)
+  **回滚历史在实时/滚动边界处平滑。** 把 SFTP 面板拉上来盖住终端再放下后,往回翻
+  历史时接近底部不再跳。
+- **Fast drag-selection in the terminal works again.** A quick drag is no longer
+  stolen by the Flickable, so selecting text by dragging fast still selects. (#119)
+  **终端里快速拖动选择恢复正常。** 快速拖动不再被滚动容器抢走,快速拖选也能选中。
+- **The Interface dialog's close button can't be dragged off-screen.** Its drag
+  is clamped inside the window, so the modal dialog can no longer become
+  unclosable. (#119)
+  **「界面」设置对话框的关闭按钮不会被拖出屏幕。** 拖动被限制在窗口内,模态对话框
+  不会再变得无法关闭。
+
+## [0.4.7] - 2026-06-16
+
+### Added / 新增
+
+- **Host-key verification with a first-connect confirmation dialog.** On first
+  contact a dialog shows the host, key type and SHA256 fingerprint; the key is
+  remembered (a known_hosts file beside sessions.json) only after you trust it.
+  A later key that differs is flagged as a possible MITM and needs re-confirming.
+  Replaces the previous "accept any key" behaviour. (#109)
+  **主机密钥校验 + 首次连接确认弹窗。** 首次连接会弹窗显示主机、密钥类型和 SHA256
+  指纹,确认信任后才记住(known_hosts 文件,与 sessions.json 同目录);之后密钥若
+  变化会作为疑似中间人攻击提示并要求重新确认。取代了原先「接受任意密钥」的行为。
+- **Quick-connect login, Xshell-style.** New SSH/Telnet sessions now require a
+  host. The username no longer defaults to `root`; if a session is missing its
+  username and/or (password-auth) password, you're prompted for them on connect,
+  with an optional "remember". Auto-naming uses `user@host`, or just the host
+  when no username is given. (#110)
+  **类 Xshell 的快速连接登录。** 新建 SSH/Telnet 会话需填主机;用户名不再默认
+  `root`;会话缺用户名 和/或(密码认证)密码时,连接时弹窗补充,可勾选「记住」。
+  自动命名用 `user@host`,无用户名时仅用主机名。
+- **Commands typed in the terminal now join the command history.** Captured via
+  the shell integration hook (bash/zsh), so the command box and ↑/↓ recall
+  include what you ran in the terminal — passwords typed at prompts are never
+  captured. (#113)
+  **终端里直接敲的命令现在也进命令历史。** 通过 shell 集成钩子(bash/zsh)捕获,
+  命令栏和 ↑/↓ 回溯都会包含;在提示符处输入的密码不会被捕获。
+
+### Changed / 变更
+
+- **Command history is de-duplicated, most-recent last.** Re-running a command
+  moves it to the end instead of leaving duplicates; existing history is cleaned
+  up on load. (#113)
+  **命令历史全局去重,最近使用排在最后。** 重复执行只会把命令移到末尾而不再留重复
+  项;已有历史在加载时清理一次。
+
+### Fixed / 修复
+
+- **The injected prompt-setup line no longer leaks to the terminal on connect.**
+  When the echoed setup line was split across packets the matcher missed it,
+  showing `test -z "$FISH_VERSION" && eval '…'`; output is now buffered until the
+  line is complete so it's reliably stripped however it's chunked. (#98)
+  **连接后不再出现注入的设置命令。** 该回显行被分包拆开时旧逻辑匹配不到,会显示
+  `test -z "$FISH_VERSION" && eval '…'`;现在缓冲到该行完整再剥离,无论如何分块都能隐藏。
+- **ZMODEM `sz a b c` now receives every file**, not just the first — ZEOF ends a
+  file, not the session. (#109)
+  **ZMODEM `sz a b c` 现在会接收每个文件**,而不只是第一个(ZEOF 表示单个文件结束,
+  而非整个会话结束)。
+- **A denied directory listing is handled gracefully.** Instead of spinning
+  forever on a permission error, the panel stops loading and shows a clear
+  "permission denied" message while keeping the current view. (#112)
+  **目录无权限时优雅处理。** 不再卡在加载转圈,面板会停止加载并明确提示「权限不足」,
+  同时保留当前视图。
+- **IPv6 bind addresses are bracketed** for `-L`/`-D` port forwards
+  (`[::1]:8080`). (#109/#105)
+  **端口转发的 IPv6 绑定地址加方括号**(`[::1]:8080`),`-L`/`-D` 现在可用。
+
+## [0.4.6] - 2026-06-14
+
+### Fixed / 修复
+
+- **Session-sync upload now works for drag-and-drop too.** Dropping a file onto
+  the SFTP panel used a separate code path that skipped the session-sync mirror;
+  now both the upload button and drag-and-drop mirror the file to every other
+  online session, each into its own current SFTP directory. (Removed the
+  temporary upload diagnostics added in 0.4.5.)
+  **会话同步上传现在对「拖拽」也生效。** 拖文件到 SFTP 面板走的是另一条代码路径,
+  之前漏掉了会话同步;现在上传按钮和拖拽都会把文件同步到其他在线会话(各进各自
+  当前目录)。(移除了 0.4.5 加的临时上传诊断日志。)
+
+## [0.4.5] - 2026-06-14
+
+### Fixed / 修复
+
+- **Session-sync upload now targets each session's own current directory.**
+  Uploading from one session no longer reuses that session's path for the others
+  (which failed when paths differed, e.g. /home/jeff vs /home/root); each session
+  receives the file in its own current SFTP directory. (Includes temporary
+  diagnostics to nail down a remaining report.)
+  **会话同步上传改为各会话用自己的当前目录。** 从某会话上传不再把它的路径套用到
+  其他会话(路径不同就会失败,如 /home/jeff 与 /home/root);每个会话都收到文件到
+  它自己当前的 SFTP 目录。(含临时诊断日志以定位残留问题。)
+
+## [0.4.4] - 2026-06-14
+
+### Added / 新增
+
+- **Session sync / broadcast input.** A new ⟳ toggle in the top-right bar
+  mirrors keystrokes typed in any terminal to every online session
+  (Xshell-style). Off by default, runtime-only. Settings → Session sync also
+  adds "Sync file uploads during session sync": an upload is mirrored to the
+  same path on each session (or that session's current SFTP dir if the path
+  doesn't exist there).
+  **会话同步 / 广播输入。** 右上角新增 ⟳ 开关,把任意终端里敲的键同步到所有在线
+  会话(Xshell 风格);默认关闭、仅本次运行有效。设置 → 会话同步 还有「会话同步时
+  文件上传同步」:上传会同步到各会话的相同路径(该路径不存在则用该会话当前 SFTP
+  目录)。
+
+- **Tooltips on the top-bar icons** (theme / download / settings / session sync).
+  **右上角图标悬停提示**(切换主题 / 下载 / 设置 / 会话同步)。
+
+### Fixed / 修复
+
+- **Light-mode dialogs.** Inputs and buttons in the group / rename / quick-command
+  dialogs no longer blend into the background under the light theme — Slint's
+  std-widget palette now follows the app theme.
+  **浅色模式对话框。** 分组 / 重命名 / 快捷命令等对话框里的输入框和按钮在浅色主题
+  下不再与背景融为一体——std-widget 调色板现在跟随应用主题。
+
+- **Empty session groups** now show a collapse chevron and can be expanded /
+  collapsed, lining up with non-empty groups.
+  **空会话分组** 现在也显示折叠箭头、可展开 / 收起,与非空分组对齐。
+
 ## [0.4.3] - 2026-06-14
 
 ### Fixed / 修复
