@@ -179,6 +179,20 @@ key-pressed(e) => {
 | key 在保留集（`Ctrl+C/D/Z`） | ❌ 拒绝，提示"该组合保留给终端" |
 | 无冲突 | ✅ 保存、持久化、刷新 `hotkey-bindings` 该行 |
 
+### 4.8 功能处快捷键提示（发现性）
+
+让用户在**功能所在位置**直观看到快捷键存在，而不仅埋在设置页：
+
+- 在**有可见按钮的主功能**旁显示淡色 badge（如 `Ctrl+T`），颜色用 `Theme.text-muted`，跟随 `hotkey-bindings` **实时更新**（用户改键后 badge 自动变）。
+- 显示 badge 的功能（有固定按钮）：
+  - 新建标签（TabBar 的 `+` 按钮）
+  - 切换侧边栏（侧边栏折叠按钮）
+  - 打开设置（设置按钮）
+  - 切换主题（主题按钮）
+- **无固定按钮的功能**（关闭标签的 ×、复制/粘贴/字体缩放/全屏/切标签等）：仅在设置页快捷键列表中可见，不强行加 badge。
+- **交互**：badge 仅显示，不触发录制（避免与按钮自身点击冲突）。点击 badge 弹提示"在设置 → 快捷键中修改"或无响应。
+- **修改入口**统一在设置页快捷键页（见 4.6）。
+
 ## 5. 向后兼容
 
 - 旧配置 json 中的具名字段（`new_tab` / `close_tab` / `toggle_sidebar` / `new_session` / `settings`）在 deserialize 时**迁移**到 `HashMap`：读旧字段 → 填入对应 `action`。
@@ -191,7 +205,7 @@ key-pressed(e) => {
 |---|---|
 | [config.rs](../../../src/config.rs) | `HotkeyConfig` → `HashMap`；新增 `HotkeyDef` 表 + `RESERVED` 集 + 迁移逻辑 |
 | [app.rs](../../../src/app.rs) | 启动构建 `[HotkeyBinding]`；`set_hotkey_binding` 含冲突检测；新增 `set_fullscreen` |
-| [app.slint](../../../ui/app.slint) | `HotkeyBinding` struct + 属性 + 重写 `key-pressed` + `trigger-action` 分发 + 录制状态 + 录制 UI（设置页遍历表渲染 + 冲突提示） |
+| [app.slint](../../../ui/app.slint) | `HotkeyBinding` struct + 属性 + 重写 `key-pressed` + `trigger-action` 分发 + 录制状态 + 录制 UI（设置页遍历表渲染 + 冲突提示） + 主功能按钮 badge 显示 |
 
 > 录制 UI 留在现有快捷键设置页（[app.slint](../../../ui/app.slint) 的 `ifd-page == "hotkey"` 区块），不引入 `widgets.slint` 改动。
 
@@ -203,3 +217,4 @@ key-pressed(e) => {
 - 绑已被占用的组合被拒绝并提示冲突功能。
 - 终端聚焦时 `Ctrl+C/D/Z` 仍正常中断/EOF/挂起。
 - 旧配置 json 升级后快捷键不丢失。
+- 新建标签/侧边栏/设置/主题按钮处显示快捷键 badge；改键后 badge 实时更新。
