@@ -1,6 +1,6 @@
 [package]
 name = "rusterm"
-version = "0.5.10"
+version = "0.5.11"
 edition = "2021"
 authors = ["rusterm contributors"]
 description = "A FinalShell-style SSH/terminal client written in Rust + Slint"
@@ -59,6 +59,7 @@ dark-light = "1"
 # in-app update check against the GitHub releases API (#48). Runs on a
 # background thread so it never blocks startup; failure is silently ignored.
 ureq = { version = "2", features = ["tls"] }
+icu_provider = { version = "2.2.0", features = ["logging"] }
 
 # Decode the embedded PNG icon to set the window icon at runtime (Linux only).
 # On Windows the icon comes from the .ico embedded by winresource at link time;
