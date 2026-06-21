@@ -252,6 +252,13 @@ impl HostKeyResponder {
             }
         }
     }
+
+    /// Extract the inner `oneshot::Sender`, if one is still available.
+    /// Used by the UI layer which routes the decision through its own global
+    /// sender storage rather than calling `respond` directly.
+    pub fn take_sender(&self) -> Option<tokio::sync::oneshot::Sender<bool>> {
+        self.0.lock().ok().and_then(|mut g| g.take())
+    }
 }
 
 impl std::fmt::Debug for HostKeyResponder {

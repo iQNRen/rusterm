@@ -90,7 +90,7 @@ use crate::ssh::{
     format_mtime, format_size, spawn_session, ProcInfo, SessionCommand, SessionEvent,
     SessionHandle,
 };
-use crate::system::{format_bytes_per_sec, format_mem_mib, SystemSampler, SystemSnapshot};
+use crate::system::{format_bytes_per_sec, format_mem, SystemSampler, SystemSnapshot};
 
 type SftpHandles = Arc<Mutex<HashMap<String, SftpHandle>>>;
 /// Per-tab flag: once the user explicitly navigates via the SFTP tree or
@@ -2585,8 +2585,8 @@ fn refresh_sidebar(
         win.set_cpu_percent(snap.cpu_percent);
         win.set_mem_percent(snap.mem_percent);
         win.set_swap_percent(snap.swap_percent);
-        win.set_mem_detail(format_mem_mib(snap.mem_used_mib, snap.mem_total_mib).into());
-        win.set_swap_detail(format_mem_mib(snap.swap_used_mib, snap.swap_total_mib).into());
+        win.set_mem_detail(format_mem(snap.mem_used_mib, snap.mem_total_mib).into());
+        win.set_swap_detail(format_mem(snap.swap_used_mib, snap.swap_total_mib).into());
     };
     let clear_stats = |win: &AppWindow| {
         win.set_cpu_percent(0.0);
@@ -2621,10 +2621,10 @@ fn refresh_sidebar(
             win.set_mem_percent(pct(st.mem_used_kib, st.mem_total_kib));
             win.set_swap_percent(pct(st.swap_used_kib, st.swap_total_kib));
             win.set_mem_detail(
-                format_mem_mib(st.mem_used_kib / 1024, st.mem_total_kib / 1024).into(),
+                format_mem(st.mem_used_kib / 1024, st.mem_total_kib / 1024).into(),
             );
             win.set_swap_detail(
-                format_mem_mib(st.swap_used_kib / 1024, st.swap_total_kib / 1024).into(),
+                format_mem(st.swap_used_kib / 1024, st.swap_total_kib / 1024).into(),
             );
             let (name, rx, tx) = selected_iface(&st);
             win.set_net_top_up(format_bytes_per_sec(tx).into());
@@ -2971,21 +2971,27 @@ fn apply_session_event_to_window(
                 }
             }
         }
-        SessionEvent::HostKeyVerify { host, key_type, fingerprint, key_changed, response } => {
+        SessionEvent::HostKeyPrompt { host, key_type, fingerprint, changed, responder, .. } => {
             // 设置主机密钥验证对话框
             win.set_host_key_host(host.into());
             win.set_host_key_type(key_type.into());
             win.set_host_key_fingerprint(fingerprint.into());
-            win.set_host_key_changed(key_changed);
+            win.set_host_key_changed(changed);
             win.set_host_key_open(true);
-            // 从 Arc<Mutex<Option<Sender>>> 中提取 Sender，保存到全局变量
-            if let Ok(mut resp_guard) = response.lock() {
-                if let Some(tx) = resp_guard.take() {
-                    if let Ok(mut guard) = HOST_KEY_RESPONSE.lock() {
-                        *guard = Some(tx);
-                    }
+            // 从 HostKeyResponder 中提取 Sender，保存到全局变量
+            if let Some(tx) = responder.take_sender() {
+                if let Ok(mut guard) = HOST_KEY_RESPONSE.lock() {
+                    *guard = Some(tx);
                 }
             }
+        }
+        // TODO: 凭证提示对话框（功能开发中）
+        SessionEvent::CredentialPrompt { .. } => {}
+        // TODO: 命令历史记录（功能开发中）
+        SessionEvent::CommandRan(_) => {}
+        // SFTP 错误：在状态栏显示消息
+        SessionEvent::SftpError(msg) => {
+            update_terminal(&|t| t.sftp_status = msg.clone().into());
         }
     }
 }
