@@ -1,5 +1,6 @@
 import { Theme } from "theme.slint";
 import { Sparkline } from "widgets.slint";
+import { FileBrowser, FileEntry } from "file_browser.slint";
 
 // One filesystem row for the disk-usage panel.
 export struct DiskInfo {
@@ -205,6 +206,7 @@ component StatusBlock inherits Rectangle {
     callback dock-drag-end();
     callback collapse();
     callback copy-text(string);
+    callback toggle-position();
     TouchArea {
         mouse-cursor: move;
         moved => {
@@ -231,6 +233,17 @@ component StatusBlock inherits Rectangle {
                    font-size: Theme.fs-md; font-weight: 600;
                    vertical-alignment: center; }
             Rectangle { horizontal-stretch: 1; }
+            // Toggle sidebar stats ↔ files.
+            Rectangle {
+                width: 18px; height: 18px;
+                y: (parent.height - self.height) / 2;
+                border-radius: Theme.radius-sm;
+                background: tg-ta.has-hover ? Theme.bg-hover : transparent;
+                tg-ta := TouchArea { mouse-cursor: pointer; clicked => { root.toggle-position(); } }
+                Text { text: "\u{E2C7}"; font-family: "Material Icons";
+                       font-size: 14px; color: Theme.text-secondary;
+                       horizontal-alignment: center; vertical-alignment: center; }
+            }
             // Collapse button — sits in front of the drag grip so it takes the click.
             Rectangle {
                 width: 18px; height: 18px;
@@ -417,6 +430,23 @@ export component Sidebar inherits Rectangle {
     callback select-net-iface(string);
     callback show-processes();           // open the process monitor popup (#23)
     callback copy-text(string);            // 复制连接信息到剪贴板
+    // File browser state (shared from AppWindow)
+    in property <string> fb-position: "sidebar";     // "sidebar" | "bottom"
+    in property <string> fb-path: "/";
+    in property <[FileEntry]> fb-entries: [];
+    in property <[string]> fb-history: [];
+    in property <string> fb-status: "";
+    in property <bool> fb-loading: false;
+    in property <bool> fb-can-go-back: false;
+    callback fb-navigate(string);
+    callback fb-go-up();
+    callback fb-go-back();
+    callback fb-refresh();
+    callback fb-toggle-position();                   // switch sidebar ↔ bottom
+    callback fb-file-drag-start(string, string, bool, length, length);
+    callback fb-file-drag-pos(length, length);
+    callback fb-file-drag-end(length, length);
+
     // Drag-to-dock: the header strip is a grab handle; coordinates are reported
     // in window space so the AppWindow can compute the target edge (#dock).
     callback dock-drag-move(length /* abs-x */, length /* abs-y */);
@@ -465,37 +495,57 @@ export component Sidebar inherits Rectangle {
             dock-drag-end() => { root.dock-drag-end(); }
             collapse() => { root.toggle-collapse(); }
             copy-text(t) => { root.copy-text(t); }
+            toggle-position() => { root.fb-toggle-position(); }
         }
-        Rectangle { height: 1px; background: Theme.border-subtle; }
-        StatsBlock {
-            resource-title: root.resource-title; proc-available: root.proc-available;
-            cpu-percent: root.cpu-percent; mem-percent: root.mem-percent; swap-percent: root.swap-percent;
-            mem-detail: root.mem-detail; swap-detail: root.swap-detail;
-            show-processes() => { root.show-processes(); }
+
+        if root.fb-position == "sidebar" : VerticalLayout {
+            spacing: 0;
+            vertical-stretch: 1;
+            FileBrowser {
+                vertical-stretch: 1;
+                current-path: root.fb-path;
+                entries: root.fb-entries;
+                history: root.fb-history;
+                status: root.fb-status;
+                loading: root.fb-loading;
+                can-go-back: root.fb-can-go-back;
+                compact: true;
+                lang-en: true;
+                navigate(p) => { root.fb-navigate(p); }
+                go-up() => { root.fb-go-up(); }
+                go-back() => { root.fb-go-back(); }
+                refresh() => { root.fb-refresh(); }
+                file-drag-start(p, n, d, x, y) => { root.fb-file-drag-start(p, n, d, x, y); }
+                file-drag-pos(x, y) => { root.fb-file-drag-pos(x, y); }
+                file-drag-end(x, y) => { root.fb-file-drag-end(x, y); }
+            }
         }
-        Rectangle { height: 1px; background: Theme.border-subtle; }
-        NetBlock {
-            net-top-up: root.net-top-up; net-top-down: root.net-top-down; net-top-history: root.net-top-history;
-            net-show-selector: root.net-show-selector; net-ifaces: root.net-ifaces; net-selected: root.net-selected;
-            net-bot-up: root.net-bot-up; net-bot-down: root.net-bot-down; net-bot-history: root.net-bot-history;
-            select-net-iface(i) => { root.select-net-iface(i); }
+
+        if root.fb-position != "sidebar" : VerticalLayout {
+            spacing: 10px;
+            StatsBlock {
+                resource-title: root.resource-title; proc-available: root.proc-available;
+                cpu-percent: root.cpu-percent; mem-percent: root.mem-percent; swap-percent: root.swap-percent;
+                mem-detail: root.mem-detail; swap-detail: root.swap-detail;
+                show-processes() => { root.show-processes(); }
+            }
+            Rectangle { height: 1px; background: Theme.border-subtle; }
+            NetBlock {
+                net-top-up: root.net-top-up; net-top-down: root.net-top-down; net-top-history: root.net-top-history;
+                net-show-selector: root.net-show-selector; net-ifaces: root.net-ifaces; net-selected: root.net-selected;
+                net-bot-up: root.net-bot-up; net-bot-down: root.net-bot-down; net-bot-history: root.net-bot-history;
+                select-net-iface(i) => { root.select-net-iface(i); }
+            }
+            Rectangle { height: 1px; background: Theme.border-subtle; }
+            DiskBlock { vertical-stretch: 1; disks: root.disks; }
         }
-        Rectangle { height: 1px; background: Theme.border-subtle; }
-        DiskBlock { vertical-stretch: 1; disks: root.disks; }
-        Text {
-            text: "rusterm v" + root.app-version;
-            color: Theme.text-muted; font-size: Theme.fs-xs; horizontal-alignment: center;
-        }
+
     }
 
     // --- Horizontal row (docked top/bottom) --------------------------------
     if root.lay-horizontal : HorizontalLayout {
         padding: 10px;
         spacing: 10px;
-        // Status + server-resources share one container, stacked vertically:
-        // the status sits as a compact two-row header *above* the CPU/Mem/Swap,
-        // both left-aligned. `alignment: start` keeps them at the top instead of
-        // stretching to fill the panel height.
         VerticalLayout {
             alignment: start;
             spacing: 8px;
@@ -509,24 +559,43 @@ export component Sidebar inherits Rectangle {
                 dock-drag-end() => { root.dock-drag-end(); }
                 collapse() => { root.toggle-collapse(); }
                 copy-text(t) => { root.copy-text(t); }
+                toggle-position() => { root.fb-toggle-position(); }
             }
-            StatsBlock {
+            if root.fb-position != "sidebar" : StatsBlock {
                 resource-title: root.resource-title; proc-available: root.proc-available;
                 cpu-percent: root.cpu-percent; mem-percent: root.mem-percent; swap-percent: root.swap-percent;
                 mem-detail: root.mem-detail; swap-detail: root.swap-detail;
                 show-processes() => { root.show-processes(); }
             }
         }
-        Rectangle { width: 1px; background: Theme.border-subtle; }
-        NetBlock {
+        if root.fb-position != "sidebar" : Rectangle { width: 1px; background: Theme.border-subtle; }
+        if root.fb-position != "sidebar" : NetBlock {
             min-width: 220px;
             net-top-up: root.net-top-up; net-top-down: root.net-top-down; net-top-history: root.net-top-history;
             net-show-selector: root.net-show-selector; net-ifaces: root.net-ifaces; net-selected: root.net-selected;
             net-bot-up: root.net-bot-up; net-bot-down: root.net-bot-down; net-bot-history: root.net-bot-history;
             select-net-iface(i) => { root.select-net-iface(i); }
         }
-        Rectangle { width: 1px; background: Theme.border-subtle; }
-        DiskBlock { horizontal-stretch: 1; disks: root.disks; }
+        if root.fb-position != "sidebar" : Rectangle { width: 1px; background: Theme.border-subtle; }
+        if root.fb-position != "sidebar" : DiskBlock { horizontal-stretch: 1; disks: root.disks; }
+        if root.fb-position == "sidebar" : FileBrowser {
+            vertical-stretch: 1;
+            current-path: root.fb-path;
+            entries: root.fb-entries;
+            history: root.fb-history;
+            status: root.fb-status;
+            loading: root.fb-loading;
+            can-go-back: root.fb-can-go-back;
+            compact: true;
+            lang-en: true;
+            navigate(p) => { root.fb-navigate(p); }
+            go-up() => { root.fb-go-up(); }
+            go-back() => { root.fb-go-back(); }
+            refresh() => { root.fb-refresh(); }
+            file-drag-start(p, n, d, x, y) => { root.fb-file-drag-start(p, n, d, x, y); }
+            file-drag-pos(x, y) => { root.fb-file-drag-pos(x, y); }
+            file-drag-end(x, y) => { root.fb-file-drag-end(x, y); }
+        }
     }
 
 }

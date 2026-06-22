@@ -104,6 +104,9 @@ export component SftpPanel inherits Rectangle {
     callback copy-path(string);
     callback new-folder(string /* parent dir */);
     callback new-file(string /* parent dir */);
+    callback sftp-drag-start(string /* path */, string /* name */, bool /* is_dir */, length /* abs-x */, length /* abs-y */);
+    callback sftp-drag-pos(length /* abs-x */, length /* abs-y */);
+    callback sftp-drag-end(length /* abs-x */, length /* abs-y */);
     // Drag-to-dock: empty areas of the panel are a grab handle; coordinates are
     // reported in window space so the parent can compute the target edge (#dock).
     callback dock-drag-move(length /* abs-x */, length /* abs-y */);
@@ -488,6 +491,10 @@ export component SftpPanel inherits Rectangle {
 
                                 row-ta := TouchArea {
                                     mouse-cursor: pointer;
+                                    property <bool> dnd-pressing: false;
+                                    property <bool> dnd-active: false;
+                                    property <length> dnd-press-x;
+                                    property <length> dnd-press-y;
                                     clicked => { root.selected-row = i; }
                                     double-clicked => {
                                         if (entry.is-dir) {
@@ -498,6 +505,19 @@ export component SftpPanel inherits Rectangle {
                                     }
                                     pointer-event(ev) => {
                                         if (ev.kind == PointerEventKind.down
+                                                && ev.button == PointerEventButton.left) {
+                                            dnd-pressing = true;
+                                            dnd-press-x = self.absolute-position.x + self.mouse-x;
+                                            dnd-press-y = self.absolute-position.y + self.mouse-y;
+                                        } else if (ev.kind == PointerEventKind.up) {
+                                            if dnd-active {
+                                                root.sftp-drag-end(self.absolute-position.x + self.mouse-x,
+                                                                   self.absolute-position.y + self.mouse-y);
+                                                dnd-active = false;
+                                            }
+                                            dnd-pressing = false;
+                                        }
+                                        if (ev.kind == PointerEventKind.down
                                                 && ev.button == PointerEventButton.right) {
                                             root.selected-row = i;
                                             root.menu-target = entry.full-path;
@@ -507,6 +527,20 @@ export component SftpPanel inherits Rectangle {
                                             root.menu-x = self.absolute-position.x + self.mouse-x - file-area.absolute-position.x;
                                             root.menu-y = self.absolute-position.y + self.mouse-y - file-area.absolute-position.y;
                                             file-menu.show();
+                                        }
+                                    }
+                                    moved => {
+                                        if dnd-pressing {
+                                            let cx = self.absolute-position.x + self.mouse-x;
+                                            let cy = self.absolute-position.y + self.mouse-y;
+                                            if Math.abs(cx - dnd-press-x) > 5px || Math.abs(cy - dnd-press-y) > 5px {
+                                                dnd-pressing = false;
+                                                dnd-active = true;
+                                                root.sftp-drag-start(entry.full-path, entry.name, entry.is-dir, cx, cy);
+                                            }
+                                        } else if dnd-active {
+                                            root.sftp-drag-pos(self.absolute-position.x + self.mouse-x,
+                                                               self.absolute-position.y + self.mouse-y);
                                         }
                                     }
                                 }

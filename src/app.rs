@@ -1068,41 +1068,6 @@ pub fn run() -> Result<()> {
         #[cfg(all(not(windows), not(target_os = "macos")))]
         let _ = std::process::Command::new("xdg-open").arg(url).spawn();
     });
-    // Query the GitHub releases API on a background thread; if a newer version
-    // exists, flip the banner on. Best-effort: any network/parse error is
-    // silently ignored and the app keeps working on the current version.
-    {
-        let weak = window.as_weak();
-        std::thread::spawn(move || {
-            let body = match ureq::get(
-                "https://api.github.com/repos/iqnren/rusterm/releases/latest",
-            )
-            .set("User-Agent", "rusterm-update-check")
-            .timeout(std::time::Duration::from_secs(8))
-            .call()
-            {
-                Ok(resp) => resp.into_string().unwrap_or_default(),
-                Err(_) => return,
-            };
-            let json: serde_json::Value = match serde_json::from_str(&body) {
-                Ok(v) => v,
-                Err(_) => return,
-            };
-            let tag = json["tag_name"].as_str().unwrap_or("").to_string();
-            let newer = matches!(
-                (parse_version(&tag), parse_version(env!("CARGO_PKG_VERSION"))),
-                (Some(latest), Some(cur)) if latest > cur
-            );
-            if !newer {
-                return;
-            }
-            let _ = weak.upgrade_in_event_loop(move |w| {
-                w.set_update_version(tag.into());
-                w.set_update_available(true);
-            });
-        });
-    }
-
     // Transfer records (download/upload progress + history) shown in the popup.
     let transfers_model: Rc<VecModel<TransferInfo>> = Rc::new(VecModel::default());
     window.set_transfers(ModelRc::from(transfers_model.clone()));
@@ -1162,6 +1127,8 @@ pub fn run() -> Result<()> {
         sftp_last_cwd.clone(),
     );
     wire_sftp_callbacks(&window, sftp_handles.clone(), sftp_last_cwd.clone());
+    wire_fb_callbacks(&window);
+    wire_dnd_handlers(&window, handles.clone(), sftp_handles.clone());
     wire_key_input(
         &window,
         handles.clone(),
@@ -3364,12 +3331,6 @@ fn wire_tab_callbacks(
     // Selecting a tab is already applied inside the Slint callback; we just
     // need to keep the C++/Rust state in sync if needed.
     {
-        window.on_tab_selected(move |_id: SharedString| {
-            // No-op: AppWindow.active-tab-id is updated inline in the .slint.
-        });
-    }
-
-    {
         let weak = window.as_weak();
         let tabs_model = tabs_model.clone();
         let terminals_model = terminals_model.clone();
@@ -4137,6 +4098,314 @@ fn wire_sftp_callbacks(
             w.set_editor_dirty(false);
         });
     }
+}
+
+// ---------------------------------------------------------------------------
+// FileBrowser callbacks (local filesystem in sidebar)
+// ---------------------------------------------------------------------------
+
+fn list_local_dir(path: &str) -> Vec<FileEntry> {
+    let mut entries = Vec::new();
+    let dir = match std::fs::read_dir(path) {
+        Ok(d) => d,
+        Err(_) => return entries,
+    };
+    for entry in dir.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.starts_with('.') { continue; }
+        let metadata = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let full_path = entry.path().to_string_lossy().to_string();
+        let is_dir = metadata.is_dir();
+        let size = if is_dir {
+            String::new()
+        } else {
+            format_size(metadata.len())
+        };
+        let modified = metadata.modified()
+            .ok()
+            .and_then(|t| {
+                let duration = t.elapsed().ok()?;
+                Some(if duration.as_secs() < 3600 {
+                    format!("{}m ago", duration.as_secs() / 60)
+                } else if duration.as_secs() < 86400 {
+                    format!("{}h ago", duration.as_secs() / 3600)
+                } else {
+                    format!("{}d ago", duration.as_secs() / 86400)
+                })
+            })
+            .unwrap_or_default();
+        entries.push(FileEntry {
+            name: name.into(),
+            path: full_path.into(),
+            is_dir,
+            size: size.into(),
+            modified: modified.into(),
+        });
+    }
+    entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then(a.name.cmp(&b.name)));
+    entries
+}
+
+fn load_local_dir(win: &AppWindow, path: &str) {
+    let entries = list_local_dir(path);
+    let model = ModelRc::from(Rc::new(VecModel::from(entries)));
+    win.set_fb_entries(model);
+    win.set_fb_loading(false);
+}
+
+fn wire_fb_callbacks(window: &AppWindow) {
+    let fb_history: Arc<Mutex<Vec<String>>> = Arc::default();
+    let weak = window.as_weak();
+
+    // Init from home directory.
+    {
+        let Some(w) = weak.upgrade() else { return };
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
+        w.set_fb_path(home.as_str().into());
+        load_local_dir(&w, &home);
+    }
+
+    // Navigate.
+    {
+        let fb_history = fb_history.clone();
+        let weak = weak.clone();
+        window.on_fb_navigate(move |path: SharedString| {
+            let Some(w) = weak.upgrade() else { return };
+            let path = path.trim().to_string();
+            if path.is_empty() { return; }
+            {
+                let mut hist = fb_history.lock().unwrap();
+                if hist.last().map_or(true, |last| last != &path) {
+                    hist.push(path.clone());
+                }
+                if hist.len() > 15 { hist.remove(0); }
+                let hist_sl: Vec<SharedString> = hist.iter().map(|s| s.as_str().into()).collect();
+                w.set_fb_history(ModelRc::from(Rc::new(VecModel::from(hist_sl))));
+                w.set_fb_can_go_back(hist.len() > 1);
+            }
+            w.set_fb_path(path.as_str().into());
+            w.set_fb_loading(true);
+            load_local_dir(&w, &path);
+        });
+    }
+
+    // Go up.
+    {
+        let fb_history = fb_history.clone();
+        let weak = weak.clone();
+        window.on_fb_go_up(move || {
+            let Some(w) = weak.upgrade() else { return };
+            let current = w.get_fb_path().to_string();
+            let parent = parent_path(&current);
+            {
+                let mut hist = fb_history.lock().unwrap();
+                if hist.last().map_or(true, |last| last != &parent) {
+                    hist.push(parent.clone());
+                }
+                if hist.len() > 15 { hist.remove(0); }
+                let hist_sl: Vec<SharedString> = hist.iter().map(|s| s.as_str().into()).collect();
+                w.set_fb_history(ModelRc::from(Rc::new(VecModel::from(hist_sl))));
+                w.set_fb_can_go_back(hist.len() > 1);
+            }
+            w.set_fb_path(parent.as_str().into());
+            w.set_fb_loading(true);
+            load_local_dir(&w, &parent);
+        });
+    }
+
+    // Go back.
+    {
+        let fb_history = fb_history.clone();
+        let weak = weak.clone();
+        window.on_fb_go_back(move || {
+            let mut hist = fb_history.lock().unwrap();
+            if hist.len() < 2 { return; }
+            hist.pop();
+            let prev = hist.last().cloned().unwrap_or_else(|| "/".to_string());
+            let can_go_back = hist.len() > 1;
+            drop(hist);
+            let Some(w) = weak.upgrade() else { return };
+            {
+                let hist2 = fb_history.lock().unwrap();
+                let hist_sl: Vec<SharedString> = hist2.iter().map(|s| s.as_str().into()).collect();
+                w.set_fb_history(ModelRc::from(Rc::new(VecModel::from(hist_sl))));
+                w.set_fb_can_go_back(can_go_back);
+            }
+            w.set_fb_path(prev.as_str().into());
+            w.set_fb_loading(true);
+            load_local_dir(&w, &prev);
+        });
+    }
+
+    // Refresh.
+    {
+        let weak = weak.clone();
+        window.on_fb_refresh(move || {
+            let Some(w) = weak.upgrade() else { return };
+            let current = w.get_fb_path().to_string();
+            w.set_fb_loading(true);
+            load_local_dir(&w, &current);
+        });
+    }
+
+    // Toggle sidebar mode.
+    {
+        let weak = weak.clone();
+        window.on_fb_toggle_position(move || {
+            let Some(w) = weak.upgrade() else { return };
+            let current = w.get_fb_position().to_string();
+            let next = if current == "sidebar" { "bottom" } else { "sidebar" };
+            w.set_fb_position(next.into());
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Drag & Drop handlers — source widgets report full lifecycle via callbacks
+// ---------------------------------------------------------------------------
+fn wire_dnd_handlers(
+    window: &AppWindow,
+    handles: Rc<RefCell<HashMap<String, SessionHandle>>>,
+    sftp_handles: SftpHandles,
+) {
+    let weak = window.as_weak();
+
+    // FileBrowser → start drag
+    window.on_fb_file_drag_start({
+        let weak = weak.clone();
+        move |path: SharedString, name: SharedString, is_dir: bool, x: f32, y: f32| {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_dnd_source("local".into());
+            w.set_dnd_path(path);
+            w.set_dnd_name(name);
+            w.set_dnd_is_dir(is_dir);
+            w.set_dnd_ghost_x(x);
+            w.set_dnd_ghost_y(y);
+            w.set_dnd_active(true);
+        }
+    });
+
+    // FileBrowser → position update
+    window.on_fb_file_drag_pos({
+        let weak = weak.clone();
+        move |x: f32, y: f32| {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_dnd_ghost_x(x);
+            w.set_dnd_ghost_y(y);
+        }
+    });
+
+    // FileBrowser → drop
+    window.on_fb_file_drag_end({
+        let weak = weak.clone();
+        let handles = handles.clone();
+        let sftp_handles = sftp_handles.clone();
+        move |_x: f32, _y: f32| {
+            let Some(w) = weak.upgrade() else { return };
+            dnd_do_drop(&w, &handles, &sftp_handles);
+        }
+    });
+
+    // SFTP → start drag
+    window.on_sftp_drag_start({
+        let weak = weak.clone();
+        move |_tab_id: SharedString, path: SharedString, name: SharedString, is_dir: bool, x: f32, y: f32| {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_dnd_source("sftp".into());
+            w.set_dnd_path(path);
+            w.set_dnd_name(name);
+            w.set_dnd_is_dir(is_dir);
+            w.set_dnd_ghost_x(x);
+            w.set_dnd_ghost_y(y);
+            w.set_dnd_active(true);
+        }
+    });
+
+    // SFTP → position update
+    window.on_sftp_drag_pos({
+        let weak = weak.clone();
+        move |_tab_id: SharedString, x: f32, y: f32| {
+            let Some(w) = weak.upgrade() else { return };
+            w.set_dnd_ghost_x(x);
+            w.set_dnd_ghost_y(y);
+        }
+    });
+
+    // SFTP → drop
+    window.on_sftp_drag_end({
+        let weak = weak.clone();
+        let handles = handles.clone();
+        let sftp_handles = sftp_handles.clone();
+        move |_tab_id: SharedString, _x: f32, _y: f32| {
+            let Some(w) = weak.upgrade() else { return };
+            dnd_do_drop(&w, &handles, &sftp_handles);
+        }
+    });
+}
+
+fn dnd_do_drop(
+    w: &AppWindow,
+    handles: &Rc<RefCell<HashMap<String, SessionHandle>>>,
+    sftp_handles: &SftpHandles,
+) {
+    let source = w.get_dnd_source().to_string();
+    let path = w.get_dnd_path().to_string();
+    let name = w.get_dnd_name().to_string();
+    let is_dir = w.get_dnd_is_dir();
+    let tab_id = w.get_active_tab_id().to_string();
+
+    if source == "local" {
+        // Insert path into terminal
+        {
+            let hmap = handles.borrow();
+            if let Some(h) = hmap.get(&tab_id) {
+                let mut bytes = path.as_bytes().to_vec();
+                if is_dir {
+                    bytes.push(b'/');
+                }
+                h.send_raw(bytes);
+            }
+        }
+        // Also upload to SFTP if connected
+        {
+            if let Ok(sf) = sftp_handles.lock() {
+                if let Some(h) = sf.get(&tab_id) {
+                    let remote_dir = active_sftp_path(w, &tab_id);
+                    h.upload(path.clone(), remote_dir);
+                    w.set_toast_text(format!("正在上传: {}", name).as_str().into());
+                } else {
+                    w.set_toast_text(format!("已插入路径: {}", name).as_str().into());
+                }
+            } else {
+                w.set_toast_text(format!("已插入路径: {}", name).as_str().into());
+            }
+            w.set_toast_visible(true);
+        }
+    } else if source == "sftp" {
+        // Download to configured download directory
+        let local_dir = w.get_download_dir().to_string();
+        if !local_dir.is_empty() {
+            if let Ok(sf) = sftp_handles.lock() {
+                if let Some(h) = sf.get(&tab_id) {
+                    h.download(path, local_dir);
+                    w.set_toast_text(format!("正在下载: {}", name).as_str().into());
+                } else {
+                    w.set_toast_text("SFTP 未连接".into());
+                }
+            }
+        } else {
+            w.set_toast_text("请先设置下载目录".into());
+        }
+        w.set_toast_visible(true);
+    }
+
+    // Clear drag state
+    w.set_dnd_active(false);
+    w.set_dnd_path(Default::default());
+    w.set_dnd_name(Default::default());
 }
 
 // ---------------------------------------------------------------------------
@@ -5408,23 +5677,6 @@ fn system_monospace_fonts() -> Vec<slint::SharedString> {
 /// `http`/`https` scheme prefixes. A value without a (recognised) scheme is
 /// treated as SOCKS5, matching proxy.rs's parse default, so older configs that
 /// stored a bare `host:port` keep working.
-/// Parse a "vX.Y.Z" / "X.Y.Z" tag into a comparable tuple, or None if it isn't
-/// a three-part numeric version. A pre-release suffix on the patch (e.g.
-/// "3-rc1") is tolerated by taking its leading digits (#48).
-fn parse_version(s: &str) -> Option<(u32, u32, u32)> {
-    let s = s.trim().trim_start_matches('v');
-    let mut it = s.split('.');
-    let major = it.next()?.parse().ok()?;
-    let minor = it.next()?.parse().ok()?;
-    let patch = it
-        .next()?
-        .split(|c: char| !c.is_ascii_digit())
-        .next()?
-        .parse()
-        .ok()?;
-    Some((major, minor, patch))
-}
-
 fn split_proxy(url: &str) -> (String, String) {
     let s = url.trim();
     if s.is_empty() {
