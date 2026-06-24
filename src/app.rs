@@ -1412,25 +1412,8 @@ pub fn run() -> Result<()> {
                             if !hash.is_empty() {
                                 update_sync_hash(hash);
                             }
-                            // 重载配置（在主线程，可以安全创建新 ConfigStore）
-                            match crate::config::ConfigStore::load() {
-                                Ok(new_store) => {
-                                    // 直接设置窗口属性（不更新全局 store，下次启动生效）
-                                    let is_dark = match new_store.theme_pref() {
-                                        "light" => false,
-                                        "dark" => true,
-                                        _ => true,
-                                    };
-                                    w.set_dark_mode(is_dark);
-                                    crate::i18n::set_language(new_store.language());
-                                    crate::i18n::apply_to_slint();
-                                    w.set_lang_en(crate::i18n::is_en());
-                                    w.set_webdav_status(t("下载成功，已自动应用 ✓", "downloaded, applied ✓").into());
-                                }
-                                Err(e) => {
-                                    w.set_webdav_status(format!("{}: {e}", t("下载成功但重载失败", "downloaded but reload failed")).into());
-                                }
-                            }
+                            // 委托到主线程回调: 重载 store + 刷新 UI 会话列表
+                            w.invoke_webdav_apply_download();
                         } else if result_msg.starts_with("conflict:") {
                             // 冲突提示
                             w.set_webdav_status(t("远端有新版本，请先下载或合并", "remote has newer version, download or merge first").into());
@@ -1442,6 +1425,41 @@ pub fn run() -> Result<()> {
                     }
                 }).ok();
             });
+        });
+    }
+
+    // After WebDAV download, reload store from disk + refresh UI session list.
+    {
+        let store = store.clone();
+        let sessions_model = sessions_model.clone();
+        let weak_apply = window.as_weak();
+        window.on_webdav_apply_download(move || {
+            let Some(w) = weak_apply.upgrade() else { return };
+            match crate::config::ConfigStore::load() {
+                Ok(new_store) => {
+                    // Replace in-memory store cache with downloaded data
+                    *store.borrow_mut() = new_store;
+                    // Refresh the UI session list
+                    crate::app::sync_sessions_to_model(&store.borrow(), &sessions_model);
+                    // Apply UI settings from downloaded config
+                    let s = store.borrow();
+                    let is_dark = match s.theme_pref() {
+                        "light" => false,
+                        "dark" => true,
+                        _ => true,
+                    };
+                    w.set_dark_mode(is_dark);
+                    crate::i18n::set_language(s.language());
+                    crate::i18n::apply_to_slint();
+                    w.set_lang_en(crate::i18n::is_en());
+                    w.set_webdav_status(t("下载成功，已自动应用 ✓", "downloaded, applied ✓").into());
+                }
+                Err(e) => {
+                    w.set_webdav_status(
+                        format!("{}: {e}", t("下载成功但重载失败", "downloaded but reload failed")).into(),
+                    );
+                }
+            }
         });
     }
 

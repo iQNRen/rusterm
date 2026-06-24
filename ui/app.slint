@@ -484,6 +484,7 @@ export component AppWindow inherits Window {
     callback webdav-download();
     callback webdav-save-settings(string, string, string, bool, bool);
     callback webdav-open-dialog();
+    callback webdav-apply-download();
 
     // Toast notification
     in-out property <string> toast-text: "";
